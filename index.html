@@ -1,1591 +1,365 @@
-===== index.html =====
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Ferrovia 3D - Armamento</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-</head>
-<body>
-  <div id="game-container"></div>
-  <div id="crosshair"></div>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Ferrovia 3D - Armamento</title>
 
-  <div id="hud" class="hud hidden">
-    <div class="hud-top">
-      <div class="hud-card hud-left">
-        <div class="stat"><span>HP</span><div class="bar"><i id="hp-bar"></i></div></div>
-        <div class="stat"><span>STA</span><div class="bar"><i id="stamina-bar"></i></div></div>
-        <div class="hint-line" id="control-hint">WASD muove · Mouse ruota · E azione · F sali/scendi · Q usa mezzo · ESC pausa</div>
-      </div>
-      <div class="hud-card hud-right">
-        <div><b id="rank-label">Operaio</b></div>
-        <div class="money" id="money-label">€ 0</div>
-        <div class="xp" id="xp-label">XP 0</div>
-        <div class="timer" id="timer-label">--:--</div>
-      </div>
-    </div>
-
-    <div id="notification-stack"></div>
-
-    <div class="objective-panel">
-      <div class="objective-title" id="mission-title">Missione</div>
-      <div class="objective-step" id="mission-step">Obiettivo</div>
-      <div class="objective-progress"><span id="step-label">1/1</span><div><i id="step-bar"></i></div></div>
-    </div>
-
-    <button id="pause-button" class="small-top-button">PAUSA</button>
-    <canvas id="minimap" width="140" height="140"></canvas>
-    <div id="interact-hint" class="interact-hint hidden">AZIONE</div>
-  </div>
-
-  <div id="mobile-controls" class="mobile-controls">
-    <div id="joy-zone" class="joy-zone"><div id="joy-knob" class="joy-knob"></div></div>
-    <div class="mobile-buttons">
-      <button id="btn-run" class="round-btn">CORSA</button>
-      <button id="btn-action" class="round-btn primary">AZIONE</button>
-      <button id="btn-board" class="round-btn">SALI<br>SCENDI</button>
-      <button id="btn-use" class="round-btn">USA<br>MEZZO</button>
-    </div>
-  </div>
-
-  <section id="main-menu" class="screen">
-    <div class="screen-card">
-      <h1>FERROVIA 3D</h1>
-      <p class="subtitle">Mini-gioco low-poly di armamento ferroviario</p>
-      <button id="btn-play" class="menu-btn primary">Gioca</button>
-      <button id="btn-open-missions" class="menu-btn">Missioni</button>
-      <button id="btn-open-controls" class="menu-btn">Comandi</button>
-      <button id="btn-open-settings" class="menu-btn">Impostazioni</button>
-      <button id="btn-open-progress" class="menu-btn">Progressi</button>
-    </div>
-  </section>
-
-  <section id="mission-menu" class="screen hidden">
-    <div class="screen-card wide">
-      <h2>Seleziona missione</h2>
-      <div id="mission-list" class="mission-list"></div>
-      <button data-close="mission-menu" class="menu-btn">Indietro</button>
-    </div>
-  </section>
-
-  <section id="controls-menu" class="screen hidden">
-    <div class="screen-card wide text-left">
-      <h2>Comandi</h2>
-      <p><b>PC:</b> WASD movimento, SHIFT corsa, mouse/drag camera, rotellina zoom, E azione, F sali/scendi, Q/R funzione mezzo, ESC pausa.</p>
-      <p><b>Telefono:</b> joystick a sinistra, trascina sullo schermo per ruotare la camera, pulsanti grandi a destra.</p>
-      <p><b>Obiettivo:</b> segui il marker 3D e completa gli step in ordine. Le missioni successive si sbloccano con i progressi.</p>
-      <button data-close="controls-menu" class="menu-btn">Indietro</button>
-    </div>
-  </section>
-
-  <section id="settings-menu" class="screen hidden">
-    <div class="screen-card wide">
-      <h2>Impostazioni</h2>
-      <label class="setting-row"><span>Sensibilità camera</span><input id="camera-sensitivity" type="range" min="0.4" max="2.0" step="0.1" value="1" /></label>
-      <label class="setting-row"><span>Distanza camera</span><input id="camera-distance" type="range" min="6" max="16" step="1" value="10" /></label>
-      <label class="setting-row"><span>Qualità ombre</span><input id="shadow-toggle" type="checkbox" checked /></label>
-      <button id="btn-reset-progress" class="menu-btn danger">Reset progressi</button>
-      <button data-close="settings-menu" class="menu-btn">Indietro</button>
-    </div>
-  </section>
-
-  <section id="progress-menu" class="screen hidden">
-    <div class="screen-card wide text-left">
-      <h2>Progressi</h2>
-      <div id="progress-details"></div>
-      <button data-close="progress-menu" class="menu-btn">Indietro</button>
-    </div>
-  </section>
-
-  <section id="pause-menu" class="screen hidden">
-    <div class="screen-card">
-      <h2>Pausa</h2>
-      <button id="btn-resume" class="menu-btn primary">Riprendi</button>
-      <button id="btn-restart" class="menu-btn">Ricomincia missione</button>
-      <button id="btn-exit" class="menu-btn">Menu principale</button>
-    </div>
-  </section>
-
-  <section id="result-menu" class="screen hidden">
-    <div class="screen-card">
-      <h2 id="result-title">Missione completata</h2>
-      <p id="result-text" class="subtitle"></p>
-      <div id="result-reward" class="reward-line"></div>
-      <button id="btn-next-mission" class="menu-btn primary">Prossima missione</button>
-      <button id="btn-result-missions" class="menu-btn">Menu missioni</button>
-      <button id="btn-result-home" class="menu-btn">Menu principale</button>
-    </div>
-  </section>
-
-  <script src="main.js"></script>
-</body>
-</html>
-
-
-===== style.css =====
-* { box-sizing: border-box; }
-html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #0b1015; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
-#game-container { position: fixed; inset: 0; }
-#crosshair { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.45); transform: translate(-50%,-50%); z-index: 25; pointer-events: none; }
-.hidden { display: none !important; }
-
-.screen { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 18px; background: radial-gradient(circle at top, rgba(30,55,70,.88), rgba(0,0,0,.92)); color: #fff; }
-.screen-card { width: min(430px, 96vw); max-height: 92vh; overflow: auto; padding: 28px; border-radius: 22px; background: rgba(12,18,25,.92); border: 2px solid rgba(243,156,18,.85); box-shadow: 0 18px 50px rgba(0,0,0,.55); text-align: center; }
-.screen-card.wide { width: min(780px, 96vw); }
-.text-left { text-align: left; }
-h1 { margin: 0; color: #f6a21a; font-size: clamp(2.5rem, 8vw, 4.5rem); letter-spacing: .12em; line-height: .95; text-shadow: 0 0 18px rgba(246,162,26,.5); }
-h2 { margin: 0 0 18px; color: #f6a21a; font-size: clamp(1.7rem, 5vw, 2.4rem); }
-.subtitle { color: #cdd6df; line-height: 1.45; }
-.menu-btn { width: min(310px, 100%); min-height: 50px; margin: 8px auto; display: block; border: 2px solid #f6a21a; border-radius: 14px; background: rgba(255,255,255,.04); color: #fff; font-size: 1.05rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
-.menu-btn.primary, .round-btn.primary { background: #f6a21a; color: #111; box-shadow: 0 0 20px rgba(246,162,26,.25); }
-.menu-btn.danger { border-color: #f05a4f; color: #ffb1aa; }
-.menu-btn:active { transform: scale(.98); }
-
-.mission-list { display: grid; gap: 10px; margin: 16px 0; }
-.mission-card { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 14px; border: 1px solid rgba(255,255,255,.12); border-left: 5px solid #f6a21a; border-radius: 14px; background: rgba(255,255,255,.045); text-align: left; }
-.mission-card.locked { opacity: .5; border-left-color: #6f7781; }
-.mission-card h3 { margin: 0 0 4px; color: #fff; }
-.mission-card p { margin: 0; color: #bfc8d2; font-size: .93rem; }
-.mission-card button { width: 115px; margin: 0; min-height: 42px; font-size: .85rem; }
-
-.hud { position: fixed; inset: 0; z-index: 40; pointer-events: none; padding: env(safe-area-inset-top) 14px 14px; color: #fff; }
-.hud-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; margin-top: 12px; }
-.hud-card { pointer-events: none; background: rgba(15,23,32,.78); border-radius: 15px; border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(8px); padding: 10px 12px; box-shadow: 0 8px 25px rgba(0,0,0,.22); }
-.hud-left { min-width: min(390px, 62vw); border-left: 4px solid #f6a21a; }
-.hud-right { min-width: 150px; text-align: right; border-right: 4px solid #f6a21a; font-weight: 900; }
-.stat { display: flex; align-items: center; gap: 10px; margin: 5px 0; }
-.stat span { width: 42px; color: #cbd2db; font-weight: 900; font-size: .78rem; }
-.bar { width: 150px; height: 9px; background: rgba(255,255,255,.14); border-radius: 99px; overflow: hidden; }
-.bar i { display: block; height: 100%; width: 100%; background: #ef4d45; transition: width .15s linear; }
-#stamina-bar { background: #3498db; }
-.hint-line { color: #c4cbd4; font-size: .75rem; margin-top: 7px; }
-.money { color: #43dd83; font-size: 1.15rem; }
-.xp { color: #b7d8ff; }
-.timer { color: #ff6960; font-size: 1.3rem; margin-top: 2px; }
-.objective-panel { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(700px, calc(100vw - 28px)); padding: 13px 16px; border-radius: 18px; background: rgba(15,23,32,.82); border: 1px solid rgba(255,255,255,.12); border-bottom: 4px solid #f6a21a; box-shadow: 0 12px 32px rgba(0,0,0,.32); }
-.objective-title { color: #f6a21a; font-size: .95rem; font-weight: 950; text-transform: uppercase; letter-spacing: .08em; }
-.objective-step { margin-top: 5px; color: #fff; font-size: 1rem; line-height: 1.25; }
-.objective-progress { margin-top: 8px; display: flex; align-items: center; gap: 10px; color: #cdd5df; font-weight: 800; font-size: .78rem; }
-.objective-progress div { flex: 1; height: 7px; background: rgba(255,255,255,.13); border-radius: 99px; overflow: hidden; }
-.objective-progress i { display: block; height: 100%; width: 0%; background: #f6a21a; }
-.small-top-button { pointer-events: auto; position: fixed; top: max(16px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); border: 0; border-radius: 999px; padding: 8px 15px; background: rgba(15,23,32,.78); color: #fff; font-weight: 900; border: 1px solid rgba(255,255,255,.12); }
-#notification-stack { position: fixed; top: 19%; left: 50%; transform: translateX(-50%); display: grid; gap: 8px; width: min(520px, calc(100vw - 32px)); }
-.toast { padding: 12px 16px; border-radius: 13px; text-align: center; background: rgba(0,0,0,.78); border: 1px solid #f6a21a; color: #fff; font-weight: 900; box-shadow: 0 12px 30px rgba(0,0,0,.35); }
-.interact-hint { position: fixed; left: 50%; top: 58%; transform: translate(-50%,-50%); padding: 10px 18px; border-radius: 999px; background: rgba(0,0,0,.72); color: #fff; border: 2px solid #fff; font-weight: 950; letter-spacing: .08em; }
-#minimap { position: fixed; right: 16px; bottom: 118px; width: 140px; height: 140px; border-radius: 18px; background: rgba(15,23,32,.78); border: 1px solid rgba(255,255,255,.14); }
-.reward-line { color: #43dd83; font-size: 1.45rem; font-weight: 950; margin: 18px 0; }
-.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,.05); margin: 10px 0; color: #fff; }
-.setting-row input[type="range"] { width: min(280px, 50vw); }
-
-.mobile-controls { position: fixed; inset: auto 0 0 0; height: 270px; z-index: 55; pointer-events: none; display: none; }
-.joy-zone { position: absolute; left: max(20px, env(safe-area-inset-left)); bottom: max(25px, env(safe-area-inset-bottom)); width: 145px; height: 145px; border-radius: 50%; background: rgba(255,255,255,.13); border: 2px solid rgba(255,255,255,.25); pointer-events: auto; }
-.joy-knob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; border-radius: 50%; background: rgba(246,162,26,.78); transform: translate(-50%,-50%); box-shadow: 0 8px 20px rgba(0,0,0,.35); }
-.mobile-buttons { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: max(22px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(2, 76px); gap: 11px; pointer-events: auto; }
-.round-btn { width: 76px; height: 76px; border-radius: 50%; border: 2px solid #f6a21a; background: rgba(15,23,32,.82); color: #fff; font-size: .76rem; font-weight: 950; }
-.round-btn:active { transform: scale(.94); background: #f6a21a; color: #111; }
-
-@media (hover:hover) {
-  .menu-btn:hover { background: #f6a21a; color: #111; }
+<style>
+*{box-sizing:border-box}
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#071018;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  user-select:none;
+  -webkit-user-select:none;
+  touch-action:none;
 }
-@media (max-width: 800px) {
-  #crosshair { display: none; }
-  .mobile-controls { display: block; }
-  .hud { padding-left: 8px; padding-right: 8px; }
-  .hud-left { min-width: 58vw; }
-  .hud-card { padding: 8px 9px; border-radius: 12px; }
-  .bar { width: 88px; }
-  .hint-line { display: none; }
-  .hud-right { min-width: 112px; font-size: .82rem; }
-  .timer { font-size: 1rem; }
-  .objective-panel { bottom: 178px; padding: 10px 12px; width: calc(100vw - 18px); }
-  .objective-title { font-size: .8rem; }
-  .objective-step { font-size: .88rem; }
-  #minimap { width: 96px; height: 96px; right: 9px; bottom: 260px; opacity: .88; }
-  #notification-stack { top: 16%; }
-  .screen-card { padding: 22px; border-radius: 18px; }
-  .mission-card { grid-template-columns: 1fr; }
-  .mission-card button { width: 100%; }
+#game-container{
+  position:fixed;
+  inset:0;
+  z-index:1;
+}
+.hidden{
+  display:none!important;
+}
+#crosshair{
+  position:fixed;
+  left:50%;
+  top:50%;
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:rgba(255,255,255,.55);
+  transform:translate(-50%,-50%);
+  z-index:20;
+  pointer-events:none;
 }
 
-
-===== main.js =====
-/*
-  Ferrovia 3D - versione mini-gioco giocabile per GitHub Pages.
-  Dipendenza unica: Three.js r128 via CDN, caricata in index.html.
-*/
-(() => {
-  'use strict';
-
-  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-  const lerp = (a, b, t) => a + (b - a) * t;
-  const dist2D = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-  const now = () => performance.now() / 1000;
-
-  const RANKS = [
-    { name: 'Operaio', xp: 0 },
-    { name: 'Caposquadra', xp: 120 },
-    { name: 'Assistente', xp: 300 },
-    { name: 'Direttore di cantiere', xp: 620 }
-  ];
-
-  const MISSION_DATA = [
-    {
-      id: 1,
-      title: 'Ispezione linea',
-      description: 'Cammina lungo il binario, trova 3 difetti evidenziati e registrali.',
-      rewardMoney: 150,
-      rewardXp: 60,
-      timeLimit: 360,
-      steps: [
-        { text: 'Raggiungi il primo difetto sulla rotaia e registralo.', target: 'defect_rail_1', kind: 'inspect' },
-        { text: 'Raggiungi la traversina danneggiata e registrala.', target: 'defect_sleeper_1', kind: 'inspect' },
-        { text: 'Raggiungi il tratto di ballast scarso e registralo.', target: 'defect_ballast_1', kind: 'inspect' }
-      ]
-    },
-    {
-      id: 2,
-      title: 'Sostituzione traversina',
-      description: 'Prendi gli attrezzi, rimuovi la traversina rotta e posiziona quella nuova.',
-      rewardMoney: 230,
-      rewardXp: 90,
-      timeLimit: 420,
-      steps: [
-        { text: 'Raggiungi il deposito attrezzi e prendi chiave e pinza attacchi.', target: 'tool_depot', kind: 'pickupTools' },
-        { text: 'Vai alla traversina danneggiata evidenziata.', target: 'broken_sleeper', kind: 'reach' },
-        { text: 'Rimuovi gli attacchi della traversina.', target: 'broken_sleeper', kind: 'removeFasteners' },
-        { text: 'Estrai la traversina danneggiata.', target: 'broken_sleeper', kind: 'removeSleeper' },
-        { text: 'Prendi una nuova traversina dal deposito materiali.', target: 'new_sleeper_stack', kind: 'pickupSleeper' },
-        { text: 'Porta la nuova traversina nel punto corretto e posizionala.', target: 'broken_sleeper', kind: 'placeSleeper' },
-        { text: 'Conferma serraggio e controllo finale dello scartamento.', target: 'broken_sleeper', kind: 'confirmWork' }
-      ]
-    },
-    {
-      id: 3,
-      title: 'Uso caricatore gomma-rotaia',
-      description: 'Sali sul caricatore, carica materiale e portalo in zona cantiere.',
-      rewardMoney: 300,
-      rewardXp: 120,
-      timeLimit: 480,
-      steps: [
-        { text: 'Raggiungi il caricatore gomma-rotaia e sali a bordo.', target: 'loader', kind: 'boardLoader' },
-        { text: 'Guida il caricatore dentro la zona deposito materiali.', target: 'loader_pick_zone', kind: 'driveVehicleToZone', vehicle: 'loader' },
-        { text: 'Usa il braccio per prendere il pacco traversine.', target: 'material_bundle', kind: 'loaderPick' },
-        { text: 'Trasporta il materiale vicino al binario, nella zona arancione.', target: 'loader_drop_zone', kind: 'driveVehicleToZone', vehicle: 'loader' },
-        { text: 'Rilascia il materiale nell’area corretta.', target: 'loader_drop_zone', kind: 'loaderDrop' }
-      ]
-    },
-    {
-      id: 4,
-      title: 'Rincalzatura binario',
-      description: 'Sali sulla rincalzatrice, allineala e completa 3 cicli di rincalzatura.',
-      rewardMoney: 380,
-      rewardXp: 150,
-      timeLimit: 540,
-      steps: [
-        { text: 'Raggiungi la macchina rincalzatrice e sali in cabina.', target: 'tamper', kind: 'boardTamper' },
-        { text: 'Porta la rincalzatrice sul primo punto marcato.', target: 'tamp_1', kind: 'driveVehicleToZone', vehicle: 'tamper' },
-        { text: 'Abbassa gli organi e completa il ciclo di rincalzatura 1/3.', target: 'tamp_1', kind: 'tampCycle' },
-        { text: 'Sposta la macchina sul secondo punto marcato.', target: 'tamp_2', kind: 'driveVehicleToZone', vehicle: 'tamper' },
-        { text: 'Completa il ciclo di rincalzatura 2/3.', target: 'tamp_2', kind: 'tampCycle' },
-        { text: 'Sposta la macchina sul terzo punto marcato.', target: 'tamp_3', kind: 'driveVehicleToZone', vehicle: 'tamper' },
-        { text: 'Completa il ciclo di rincalzatura 3/3.', target: 'tamp_3', kind: 'tampCycle' }
-      ]
-    },
-    {
-      id: 5,
-      title: 'Lavoro su scambio',
-      description: 'Controlla deviatoio, aghi e ballast. Lavora solo dentro la zona autorizzata.',
-      rewardMoney: 450,
-      rewardXp: 170,
-      timeLimit: 500,
-      steps: [
-        { text: 'Raggiungi lo scambio e controlla gli aghi.', target: 'switch_needles', kind: 'inspectSwitch' },
-        { text: 'Sistema il ballast scarso vicino al contrago.', target: 'switch_ballast', kind: 'fixBallast' },
-        { text: 'Sostituisci la traversina difettosa dello scambio.', target: 'switch_sleeper', kind: 'fixSwitchSleeper' },
-        { text: 'Conferma il controllo finale dello scambio.', target: 'switch_needles', kind: 'confirmSwitch' }
-      ]
-    },
-    {
-      id: 6,
-      title: 'Cantiere completo',
-      description: 'Missione finale: ispezione, trasporto materiale e rincalzatura in sequenza.',
-      rewardMoney: 700,
-      rewardXp: 260,
-      timeLimit: 720,
-      steps: [
-        { text: 'Fai ispezione del difetto principale di linea.', target: 'final_defect', kind: 'inspect' },
-        { text: 'Sali sul caricatore gomma-rotaia.', target: 'loader', kind: 'boardLoader' },
-        { text: 'Preleva il materiale per il cantiere finale.', target: 'material_bundle', kind: 'loaderPick' },
-        { text: 'Porta il materiale nella zona finale di posa.', target: 'final_drop_zone', kind: 'driveVehicleToZone', vehicle: 'loader' },
-        { text: 'Rilascia il materiale nella zona finale.', target: 'final_drop_zone', kind: 'loaderDrop' },
-        { text: 'Sali sulla rincalzatrice.', target: 'tamper', kind: 'boardTamper' },
-        { text: 'Porta la rincalzatrice sul punto finale.', target: 'final_tamp', kind: 'driveVehicleToZone', vehicle: 'tamper' },
-        { text: 'Completa il ciclo finale di rincalzatura.', target: 'final_tamp', kind: 'tampCycle' },
-        { text: 'Torna al capocantiere e consegna il rapporto.', target: 'foreman', kind: 'confirmFinal' }
-      ]
-    }
-  ];
-
-  const STORAGE_KEY = 'ferrovia3d_progress_v2';
-  const defaultProgress = () => ({ money: 0, xp: 0, unlocked: 1, completed: [] });
-  const loadProgress = () => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return defaultProgress();
-      return { ...defaultProgress(), ...JSON.parse(raw) };
-    } catch (err) {
-      return defaultProgress();
-    }
-  };
-  const saveProgress = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(Game.progress));
-
-  const Game = {
-    progress: loadProgress(),
-    state: 'menu',
-    activeMissionId: 1,
-    activeMission: null,
-    stepIndex: 0,
-    stepProgress: 0,
-    timer: 0,
-    failures: 0,
-    hp: 100,
-    stamina: 100,
-    hasTools: false,
-    carryingSleeper: false,
-    carryingBundle: false,
-    mode: 'foot',
-    vehicle: null,
-    currentInteractable: null,
-    muted: false,
-    lastToast: 0
-  };
-
-  const Input = {
-    keys: Object.create(null),
-    runButton: false,
-    joystick: { active: false, x: 0, y: 0 },
-    camera: { theta: Math.PI * 1.05, phi: 0.38, distance: 10, sens: 1, touchDrag: false, lastX: 0, lastY: 0 },
-    pointerLocked: false
-  };
-
-  const dom = {};
-  const setScreen = (id, visible) => dom[id].classList.toggle('hidden', !visible);
-  const hideAllScreens = () => ['mainMenu','missionMenu','controlsMenu','settingsMenu','progressMenu','pauseMenu','resultMenu'].forEach(k => dom[k].classList.add('hidden'));
-
-  function allScreensHidden() {
-    return ['mainMenu','missionMenu','controlsMenu','settingsMenu','progressMenu','pauseMenu','resultMenu'].every(k => dom[k].classList.contains('hidden'));
-  }
-
-  let scene, camera, renderer, clock;
-  const objects = new Map();
-  const markers = new Map();
-  const interactables = [];
-  const vehicles = {};
-  const colliders = [];
-  let player;
-  let legL, legR, armL, armR;
-  let sunLight;
-  let tampAnim = 0;
-  let loaderArmAnim = 0;
-  let carriedVisual = null;
-
-  const mats = {};
-  const tempVec = new THREE.Vector3();
-
-  const AudioFx = {
-    ctx: null,
-    init() {
-      if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-      if (this.ctx.state === 'suspended') this.ctx.resume();
-    },
-    tone(freq = 440, type = 'sine', duration = 0.08, volume = 0.05) {
-      if (Game.muted) return;
-      this.init();
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = type;
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(volume, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + duration);
-    },
-    noise(duration = 0.08, volume = 0.03) {
-      if (Game.muted) return;
-      this.init();
-      const len = Math.max(1, Math.floor(this.ctx.sampleRate * duration));
-      const buffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-      const src = this.ctx.createBufferSource();
-      src.buffer = buffer;
-      const gain = this.ctx.createGain();
-      gain.gain.value = volume;
-      src.connect(gain);
-      gain.connect(this.ctx.destination);
-      src.start();
-    },
-    success() { this.tone(420, 'square', 0.08, 0.05); setTimeout(() => this.tone(650, 'square', 0.14, 0.05), 90); },
-    fail() { this.tone(180, 'sawtooth', 0.25, 0.05); },
-    clank() { this.tone(220, 'triangle', 0.09, 0.06); this.noise(0.04, 0.02); }
-  };
-
-  function initDOM() {
-    const ids = {
-      mainMenu: 'main-menu', missionMenu: 'mission-menu', controlsMenu: 'controls-menu', settingsMenu: 'settings-menu', progressMenu: 'progress-menu', pauseMenu: 'pause-menu', resultMenu: 'result-menu',
-      missionList: 'mission-list', progressDetails: 'progress-details', hud: 'hud', mobileControls: 'mobile-controls', gameContainer: 'game-container',
-      hpBar: 'hp-bar', staminaBar: 'stamina-bar', rankLabel: 'rank-label', moneyLabel: 'money-label', xpLabel: 'xp-label', timerLabel: 'timer-label',
-      missionTitle: 'mission-title', missionStep: 'mission-step', stepLabel: 'step-label', stepBar: 'step-bar', interactHint: 'interact-hint', notificationStack: 'notification-stack',
-      minimap: 'minimap', resultTitle: 'result-title', resultText: 'result-text', resultReward: 'result-reward', btnNextMission: 'btn-next-mission',
-      joyZone: 'joy-zone', joyKnob: 'joy-knob', btnRun: 'btn-run', btnAction: 'btn-action', btnBoard: 'btn-board', btnUse: 'btn-use',
-      pauseButton: 'pause-button', cameraSensitivity: 'camera-sensitivity', cameraDistance: 'camera-distance', shadowToggle: 'shadow-toggle'
-    };
-    Object.entries(ids).forEach(([key, id]) => { dom[key] = document.getElementById(id); });
-
-    document.getElementById('btn-play').addEventListener('click', () => startMission(Game.progress.unlocked));
-    document.getElementById('btn-open-missions').addEventListener('click', openMissionMenu);
-    document.getElementById('btn-open-controls').addEventListener('click', () => setScreen('controlsMenu', true));
-    document.getElementById('btn-open-settings').addEventListener('click', () => setScreen('settingsMenu', true));
-    document.getElementById('btn-open-progress').addEventListener('click', openProgressMenu);
-    document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => {
-      const key = btn.dataset.close.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      setScreen(key, false);
-      if (Game.state !== 'playing' && allScreensHidden()) setScreen('mainMenu', true);
-    }));
-    document.getElementById('btn-reset-progress').addEventListener('click', resetProgress);
-    document.getElementById('btn-resume').addEventListener('click', resumeGame);
-    document.getElementById('btn-restart').addEventListener('click', () => startMission(Game.activeMissionId));
-    document.getElementById('btn-exit').addEventListener('click', exitToMain);
-    document.getElementById('btn-result-missions').addEventListener('click', openMissionMenu);
-    document.getElementById('btn-result-home').addEventListener('click', exitToMain);
-    dom.btnNextMission.addEventListener('click', () => startMission(Math.min(Game.activeMissionId + 1, MISSION_DATA.length)));
-    dom.pauseButton.addEventListener('click', pauseGame);
-
-    dom.cameraSensitivity.addEventListener('input', () => { Input.camera.sens = Number(dom.cameraSensitivity.value); });
-    dom.cameraDistance.addEventListener('input', () => { Input.camera.distance = Number(dom.cameraDistance.value); });
-    dom.shadowToggle.addEventListener('change', () => {
-      renderer.shadowMap.enabled = dom.shadowToggle.checked;
-      scene.traverse(o => { if (o.isMesh) o.needsUpdate = true; });
-    });
-  }
-
-  function initThree() {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x8cc8e8);
-    scene.fog = new THREE.Fog(0x8cc8e8, 55, 190);
-
-    camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 900);
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.6));
-    renderer.setSize(innerWidth, innerHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    dom.gameContainer.appendChild(renderer.domElement);
-    clock = new THREE.Clock();
-
-    window.addEventListener('resize', onResize);
-  }
-
-  function createMaterials() {
-    Object.assign(mats, {
-      ground: new THREE.MeshLambertMaterial({ color: 0x5a604f }),
-      ballast: new THREE.MeshLambertMaterial({ color: 0x777b78 }),
-      ballastDark: new THREE.MeshLambertMaterial({ color: 0x4b4d4b }),
-      rail: new THREE.MeshStandardMaterial({ color: 0x5f6870, metalness: 0.65, roughness: 0.35 }),
-      sleeperWood: new THREE.MeshLambertMaterial({ color: 0x6b442c }),
-      sleeperBad: new THREE.MeshLambertMaterial({ color: 0x3b2820 }),
-      concrete: new THREE.MeshLambertMaterial({ color: 0xaaa89f }),
-      orange: new THREE.MeshLambertMaterial({ color: 0xff7b00 }),
-      yellow: new THREE.MeshLambertMaterial({ color: 0xf0c800 }),
-      dark: new THREE.MeshLambertMaterial({ color: 0x1d2732 }),
-      red: new THREE.MeshLambertMaterial({ color: 0xc6382c }),
-      white: new THREE.MeshLambertMaterial({ color: 0xf2f2f2 }),
-      blue: new THREE.MeshLambertMaterial({ color: 0x2f8bd2 }),
-      green: new THREE.MeshLambertMaterial({ color: 0x2ecc71 }),
-      marker: new THREE.MeshBasicMaterial({ color: 0xffb21a, transparent: true, opacity: 0.88 }),
-      zone: new THREE.MeshBasicMaterial({ color: 0xffa000, transparent: true, opacity: 0.22, side: THREE.DoubleSide }),
-      zoneGreen: new THREE.MeshBasicMaterial({ color: 0x2ecc71, transparent: true, opacity: 0.20, side: THREE.DoubleSide }),
-      glass: new THREE.MeshLambertMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.55 })
-    });
-  }
-
-  function makeBox(w, h, d, mat, x = 0, y = 0, z = 0) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    mesh.position.set(x, y, z);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
-  }
-
-  function makeCylinder(radiusTop, radiusBottom, height, radial, mat, x = 0, y = 0, z = 0) {
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radial), mat);
-    mesh.position.set(x, y, z);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
-  }
-
-  function initWorld() {
-    const ambient = new THREE.HemisphereLight(0xdff4ff, 0x343324, 0.72);
-    scene.add(ambient);
-
-    sunLight = new THREE.DirectionalLight(0xfff1c6, 1.2);
-    sunLight.position.set(-45, 85, 40);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.set(2048, 2048);
-    sunLight.shadow.camera.left = -90;
-    sunLight.shadow.camera.right = 90;
-    sunLight.shadow.camera.top = 90;
-    sunLight.shadow.camera.bottom = -90;
-    sunLight.shadow.camera.far = 240;
-    scene.add(sunLight);
-
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), mats.ground);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
-    buildBallastBed(0, 0, 150, 4.4);
-    buildTrack(0, 0, 150, 'main');
-    buildTrack(8, -10, 80, 'service');
-    buildSwitch();
-    buildScenery();
-    buildDepot();
-    buildObjectiveObjects();
-    buildPlayer();
-    buildLoader();
-    buildTamper();
-    buildForeman();
-  }
-
-  function buildBallastBed(x, z, len, width) {
-    const bed = makeBox(width, 0.18, len, mats.ballast, x, 0.02, z);
-    bed.name = 'Massicciata';
-    scene.add(bed);
-
-    // Ghiaia low-poly: piccoli cubi irregolari leggeri.
-    const pebbleGeo = new THREE.BoxGeometry(0.12, 0.06, 0.12);
-    for (let i = 0; i < 220; i++) {
-      const p = new THREE.Mesh(pebbleGeo, Math.random() > 0.5 ? mats.ballast : mats.ballastDark);
-      p.position.set(x + (Math.random() - 0.5) * width, 0.14 + Math.random() * 0.04, z + (Math.random() - 0.5) * len);
-      p.rotation.set(Math.random(), Math.random(), Math.random());
-      p.receiveShadow = true;
-      scene.add(p);
-    }
-  }
-
-  function buildTrack(x, z, len, prefix) {
-    const group = new THREE.Group();
-    group.position.set(x, 0, z);
-
-    const railGeo = new THREE.BoxGeometry(0.16, 0.22, len);
-    const railL = new THREE.Mesh(railGeo, mats.rail);
-    const railR = new THREE.Mesh(railGeo, mats.rail);
-    railL.position.set(-0.75, 0.26, 0);
-    railR.position.set(0.75, 0.26, 0);
-    railL.castShadow = railR.castShadow = true;
-    railL.receiveShadow = railR.receiveShadow = true;
-    group.add(railL, railR);
-
-    const sleeperGeo = new THREE.BoxGeometry(2.65, 0.16, 0.32);
-    const half = len / 2;
-    for (let zz = -half + 1; zz < half; zz += 0.72) {
-      const tie = new THREE.Mesh(sleeperGeo, mats.sleeperWood);
-      tie.position.set(0, 0.12, zz);
-      tie.castShadow = true;
-      tie.receiveShadow = true;
-      group.add(tie);
-    }
-    scene.add(group);
-  }
-
-  function buildSwitch() {
-    const baseZ = 44;
-    const g = new THREE.Group();
-    g.position.set(0, 0, baseZ);
-
-    // Rami deviati, rappresentazione semplice ma riconoscibile.
-    for (const side of [-1, 1]) {
-      const rail = makeBox(0.13, 0.18, 34, mats.rail);
-      rail.position.set(side * 1.15, 0.33, 13);
-      rail.rotation.y = side * 0.22;
-      g.add(rail);
-    }
-    const needleL = makeBox(0.12, 0.15, 12, mats.rail, -0.32, 0.39, -3);
-    const needleR = makeBox(0.12, 0.15, 12, mats.rail, 0.32, 0.39, -3);
-    needleL.rotation.y = -0.08;
-    needleR.rotation.y = 0.08;
-    g.add(needleL, needleR);
-
-    for (let i = 0; i < 16; i++) {
-      const tie = makeBox(3.4 + i * 0.04, 0.13, 0.3, mats.sleeperWood, 0, 0.13, -8 + i * 1.0);
-      g.add(tie);
-    }
-    scene.add(g);
-  }
-
-  function buildScenery() {
-    // Recinzioni cantiere.
-    for (let z = -48; z <= 12; z += 5) {
-      const post1 = makeBox(0.12, 1.1, 0.12, mats.white, -7.2, 0.55, z);
-      const post2 = makeBox(0.12, 1.1, 0.12, mats.white, -7.2, 0.55, z + 2.2);
-      const bar = makeBox(0.08, 0.12, 2.2, mats.red, -7.2, 0.95, z + 1.1);
-      scene.add(post1, post2, bar);
-    }
-
-    // Segnali, picchetti, coni, barriere.
-    for (let i = 0; i < 12; i++) {
-      const cone = new THREE.Group();
-      const body = makeCylinder(0.08, 0.28, 0.6, 4, mats.orange, 0, 0.3, 0);
-      const stripe = makeBox(0.34, 0.07, 0.34, mats.white, 0, 0.42, 0);
-      cone.add(body, stripe);
-      cone.position.set((i % 2 ? -3.4 : 3.4), 0, -42 + i * 7.5);
-      scene.add(cone);
-    }
-
-    for (let i = 0; i < 5; i++) {
-      const mast = makeCylinder(0.07, 0.07, 3.3, 8, mats.dark, i % 2 ? 5.2 : -5.2, 1.65, -55 + i * 26);
-      const sign = makeBox(0.6, 0.75, 0.08, i % 2 ? mats.green : mats.red, mast.position.x, 3.3, mast.position.z);
-      scene.add(mast, sign);
-    }
-
-    // Piccolo capannone/deposito.
-    const shed = new THREE.Group();
-    shed.add(makeBox(5, 2.6, 5, new THREE.MeshLambertMaterial({ color: 0x46525b }), 0, 1.3, 0));
-    const roof = makeBox(5.5, 0.35, 5.5, new THREE.MeshLambertMaterial({ color: 0x30343b }), 0, 2.85, 0);
-    shed.add(roof);
-    shed.position.set(-16, 0, -18);
-    scene.add(shed);
-
-    // Alberi/colline low-poly per profondità.
-    for (let i = 0; i < 38; i++) {
-      const trunk = makeCylinder(0.12, 0.16, 1.3, 6, new THREE.MeshLambertMaterial({ color: 0x5a351d }), 0, 0.65, 0);
-      const crown = makeCylinder(0, 0.7, 1.8, 6, new THREE.MeshLambertMaterial({ color: 0x2d6b3b }), 0, 2.0, 0);
-      const tree = new THREE.Group();
-      tree.add(trunk, crown);
-      const side = Math.random() > 0.5 ? 1 : -1;
-      tree.position.set(side * (22 + Math.random() * 65), 0, -70 + Math.random() * 140);
-      tree.rotation.y = Math.random() * Math.PI;
-      scene.add(tree);
-    }
-  }
-
-  function buildDepot() {
-    createTargetZone('loader_pick_zone', new THREE.Vector3(-11, 0.04, -5), 5.5, 4.5, mats.zoneGreen);
-    createTargetZone('loader_drop_zone', new THREE.Vector3(4.0, 0.045, 13), 5, 4.5, mats.zone);
-    createTargetZone('final_drop_zone', new THREE.Vector3(3.6, 0.045, 58), 5.4, 4.6, mats.zone);
-
-    const tool = new THREE.Group();
-    tool.add(makeBox(2.2, 0.75, 1.2, mats.dark, 0, 0.38, 0));
-    tool.add(makeBox(2.4, 0.1, 1.4, mats.orange, 0, 0.82, 0));
-    tool.position.set(-14, 0, -10);
-    scene.add(tool);
-    registerObject('tool_depot', tool, 'Prendi attrezzi');
-
-    const stack = new THREE.Group();
-    for (let i = 0; i < 7; i++) stack.add(makeBox(2.4, 0.16, 0.34, mats.concrete, 0, 0.12 + i * 0.18, 0));
-    stack.position.set(-10.5, 0, -4.2);
-    scene.add(stack);
-    registerObject('new_sleeper_stack', stack, 'Prendi nuova traversina');
-
-    const bundle = new THREE.Group();
-    for (let i = 0; i < 5; i++) bundle.add(makeBox(2.6, 0.17, 0.35, mats.concrete, 0, 0.12 + i * 0.22, 0));
-    bundle.position.set(-11, 0, -6.7);
-    scene.add(bundle);
-    registerObject('material_bundle', bundle, 'Prendi materiale col caricatore');
-  }
-
-  function buildObjectiveObjects() {
-    const defs = [
-      ['defect_rail_1', 0.75, 0.55, -28, mats.red, 'Difetto rotaia'],
-      ['defect_sleeper_1', 0, 0.36, -6, mats.red, 'Traversina danneggiata'],
-      ['defect_ballast_1', -1.8, 0.22, 20, mats.red, 'Ballast scarso'],
-      ['broken_sleeper', 0, 0.35, 7.4, mats.sleeperBad, 'Traversina da sostituire'],
-      ['tamp_1', 0, 0.14, 19, mats.zone, 'Punto rincalzatura 1'],
-      ['tamp_2', 0, 0.14, 25, mats.zone, 'Punto rincalzatura 2'],
-      ['tamp_3', 0, 0.14, 31, mats.zone, 'Punto rincalzatura 3'],
-      ['switch_needles', 0.2, 0.45, 40, mats.blue, 'Aghi dello scambio'],
-      ['switch_ballast', -1.8, 0.3, 49, mats.red, 'Ballast scambio'],
-      ['switch_sleeper', 0.5, 0.34, 53, mats.red, 'Traversina scambio'],
-      ['final_defect', -0.75, 0.55, 62, mats.red, 'Difetto finale linea'],
-      ['final_tamp', 0, 0.14, 68, mats.zone, 'Punto rincalzatura finale']
-    ];
-
-    for (const [id, x, y, z, mat, label] of defs) {
-      if (String(id).startsWith('tamp') || id === 'final_tamp') {
-        createTargetZone(id, new THREE.Vector3(x, 0.06, z), 3.2, 2.8, mats.zoneGreen);
-        continue;
-      }
-      const mesh = makeBox(0.72, 0.25, 0.72, mat, x, y, z);
-      scene.add(mesh);
-      registerObject(id, mesh, label);
-    }
-  }
-
-  function createTargetZone(id, position, w, d, mat) {
-    const zone = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
-    zone.rotation.x = -Math.PI / 2;
-    zone.position.copy(position);
-    zone.receiveShadow = true;
-    scene.add(zone);
-    registerObject(id, zone, 'Zona obiettivo', true);
-  }
-
-  function registerObject(id, object, label = 'Oggetto', isZone = false) {
-    object.userData.id = id;
-    object.userData.label = label;
-    object.userData.isZone = isZone;
-    objects.set(id, object);
-    interactables.push(object);
-    const marker = createMarker();
-    marker.visible = false;
-    scene.add(marker);
-    markers.set(id, marker);
-  }
-
-  function createMarker() {
-    const g = new THREE.Group();
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.85, 4), mats.marker);
-    cone.rotation.x = Math.PI;
-    cone.position.y = 2.2;
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.035, 8, 28), mats.marker);
-    ring.position.y = 1.58;
-    ring.rotation.x = Math.PI / 2;
-    g.add(cone, ring);
-    return g;
-  }
-
-  function buildPlayer() {
-    player = new THREE.Group();
-    player.position.set(3.5, 0, -36);
-    const torso = makeBox(0.65, 0.92, 0.42, mats.orange, 0, 1.02, 0);
-    const vest = makeBox(0.7, 0.12, 0.46, mats.yellow, 0, 1.16, 0.01);
-    const head = makeBox(0.42, 0.42, 0.42, new THREE.MeshLambertMaterial({ color: 0xf0c09a }), 0, 1.67, 0);
-    const helmet = makeCylinder(0.27, 0.31, 0.22, 12, mats.yellow, 0, 1.94, 0);
-    legL = makeBox(0.25, 0.7, 0.25, mats.dark, -0.18, 0.38, 0);
-    legR = makeBox(0.25, 0.7, 0.25, mats.dark, 0.18, 0.38, 0);
-    armL = makeBox(0.18, 0.68, 0.18, mats.orange, -0.46, 1.02, 0);
-    armR = makeBox(0.18, 0.68, 0.18, mats.orange, 0.46, 1.02, 0);
-    player.add(torso, vest, head, helmet, legL, legR, armL, armR);
-    scene.add(player);
-  }
-
-  function buildLoader() {
-    const g = new THREE.Group();
-    g.position.set(-13.5, 0, 2.5);
-    g.rotation.y = Math.PI / 2;
-    g.userData.vehicleType = 'loader';
-
-    g.add(makeBox(2.7, 0.65, 1.55, mats.yellow, 0, 0.65, 0));
-    g.add(makeBox(1.0, 1.0, 1.2, mats.glass, -0.55, 1.35, 0));
-    g.add(makeBox(1.1, 0.18, 1.3, mats.dark, -0.55, 1.95, 0));
-    for (const x of [-1.05, 1.05]) for (const z of [-0.62, 0.62]) {
-      const wheel = makeCylinder(0.36, 0.36, 0.32, 16, mats.dark, x, 0.36, z);
-      wheel.rotation.z = Math.PI / 2;
-      g.add(wheel);
-    }
-
-    const arm = new THREE.Group();
-    arm.name = 'loaderArm';
-    arm.add(makeBox(1.6, 0.18, 0.22, mats.dark, 0.8, 1.35, 0));
-    const fork = makeBox(0.75, 0.12, 1.15, mats.dark, 1.75, 1.12, 0);
-    arm.add(fork);
-    arm.position.set(0.6, 0, 0);
-    g.add(arm);
-    vehicles.loader = { group: g, speed: 0, arm, hasLoad: false, label: 'Caricatore gomma-rotaia' };
-    scene.add(g);
-    registerObject('loader', g, 'Sali sul caricatore');
-  }
-
-  function buildTamper() {
-    const g = new THREE.Group();
-    g.position.set(0, 0, -50);
-    g.userData.vehicleType = 'tamper';
-    g.add(makeBox(2.2, 1.0, 5.2, mats.yellow, 0, 1.0, 0));
-    g.add(makeBox(1.3, 0.9, 1.2, mats.glass, 0, 1.8, -1.35));
-    g.add(makeBox(2.4, 0.18, 5.4, mats.dark, 0, 0.44, 0));
-    for (const z of [-1.8, 1.8]) {
-      const axle = makeCylinder(0.28, 0.28, 1.8, 18, mats.dark, 0, 0.38, z);
-      axle.rotation.z = Math.PI / 2;
-      g.add(axle);
-    }
-    const tines = new THREE.Group();
-    tines.name = 'tampingTools';
-    for (const x of [-0.5, 0.5]) for (const z of [-0.35, 0.35]) {
-      const tine = makeBox(0.09, 1.0, 0.09, mats.dark, x, 0.35, z);
-      tines.add(tine);
-    }
-    tines.position.set(0, 0.35, 0.9);
-    g.add(tines);
-    vehicles.tamper = { group: g, speed: 0, tines, tamping: false, tampStart: 0, label: 'Macchina rincalzatrice' };
-    scene.add(g);
-    registerObject('tamper', g, 'Sali sulla rincalzatrice');
-  }
-
-  function buildForeman() {
-    const f = new THREE.Group();
-    f.add(makeBox(0.7, 0.95, 0.45, mats.blue, 0, 0.95, 0));
-    f.add(makeBox(0.42, 0.42, 0.42, new THREE.MeshLambertMaterial({ color: 0xe2ad87 }), 0, 1.62, 0));
-    f.add(makeCylinder(0.28, 0.3, 0.2, 12, mats.white, 0, 1.9, 0));
-    f.position.set(-4.5, 0, 72);
-    scene.add(f);
-    registerObject('foreman', f, 'Capocantiere');
-  }
-
-  function setupInputs() {
-    window.addEventListener('keydown', e => {
-      const key = e.key.toLowerCase();
-      Input.keys[key] = true;
-      if (Game.state !== 'playing') return;
-      if (key === 'e') handlePrimaryAction();
-      if (key === 'f') handleBoardOrExit();
-      if (key === 'q' || key === 'r') handleVehicleUse();
-      if (key === 'escape') pauseGame();
-    });
-    window.addEventListener('keyup', e => { Input.keys[e.key.toLowerCase()] = false; });
-
-    renderer.domElement.addEventListener('click', () => {
-      if (Game.state === 'playing' && !isMobile()) renderer.domElement.requestPointerLock?.();
-    });
-    document.addEventListener('pointerlockchange', () => { Input.pointerLocked = document.pointerLockElement === renderer.domElement; });
-    window.addEventListener('mousemove', e => {
-      if (!Input.pointerLocked || Game.state !== 'playing') return;
-      rotateCamera(e.movementX, e.movementY, 0.0037);
-    });
-    window.addEventListener('wheel', e => {
-      if (Game.state !== 'playing') return;
-      Input.camera.distance = clamp(Input.camera.distance + Math.sign(e.deltaY) * 0.8, 6, 18);
-      dom.cameraDistance.value = String(Math.round(Input.camera.distance));
-    }, { passive: true });
-
-    setupTouchControls();
-  }
-
-  function setupTouchControls() {
-    let joyCenter = { x: 0, y: 0 };
-    const setJoy = t => {
-      const dxRaw = t.clientX - joyCenter.x;
-      const dyRaw = t.clientY - joyCenter.y;
-      const max = 48;
-      const d = Math.hypot(dxRaw, dyRaw) || 1;
-      const dx = d > max ? dxRaw / d * max : dxRaw;
-      const dy = d > max ? dyRaw / d * max : dyRaw;
-      dom.joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-      Input.joystick.x = dx / max;
-      Input.joystick.y = dy / max;
-    };
-
-    dom.joyZone.addEventListener('touchstart', e => {
-      e.preventDefault();
-      Input.joystick.active = true;
-      const rect = dom.joyZone.getBoundingClientRect();
-      joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-      setJoy(e.changedTouches[0]);
-    }, { passive: false });
-    dom.joyZone.addEventListener('touchmove', e => { e.preventDefault(); if (Input.joystick.active) setJoy(e.changedTouches[0]); }, { passive: false });
-    dom.joyZone.addEventListener('touchend', e => {
-      e.preventDefault();
-      Input.joystick.active = false;
-      Input.joystick.x = 0;
-      Input.joystick.y = 0;
-      dom.joyKnob.style.transform = 'translate(-50%, -50%)';
-    }, { passive: false });
-
-    window.addEventListener('touchstart', e => {
-      if (e.target.closest('#mobile-controls') || e.target.closest('.screen') || Game.state !== 'playing') return;
-      Input.camera.touchDrag = true;
-      Input.camera.lastX = e.touches[0].clientX;
-      Input.camera.lastY = e.touches[0].clientY;
-    }, { passive: false });
-    window.addEventListener('touchmove', e => {
-      if (!Input.camera.touchDrag || Game.state !== 'playing') return;
-      e.preventDefault();
-      const t = e.touches[0];
-      rotateCamera(t.clientX - Input.camera.lastX, t.clientY - Input.camera.lastY, 0.007);
-      Input.camera.lastX = t.clientX;
-      Input.camera.lastY = t.clientY;
-    }, { passive: false });
-    window.addEventListener('touchend', () => { Input.camera.touchDrag = false; }, { passive: true });
-
-    const hold = (el, down, up) => {
-      el.addEventListener('touchstart', e => { e.preventDefault(); down(); }, { passive: false });
-      el.addEventListener('touchend', e => { e.preventDefault(); up?.(); }, { passive: false });
-      el.addEventListener('click', e => { e.preventDefault(); down(); up?.(); });
-    };
-    hold(dom.btnRun, () => { Input.runButton = true; }, () => { Input.runButton = false; });
-    hold(dom.btnAction, handlePrimaryAction);
-    hold(dom.btnBoard, handleBoardOrExit);
-    hold(dom.btnUse, handleVehicleUse);
-  }
-
-  function rotateCamera(dx, dy, scale) {
-    const s = Input.camera.sens;
-    Input.camera.theta -= dx * scale * s;
-    Input.camera.phi = clamp(Input.camera.phi - dy * scale * s, 0.18, 1.15);
-  }
-
-  function isMobile() { return matchMedia('(max-width: 800px)').matches || 'ontouchstart' in window; }
-
-  function openMissionMenu() {
-    hideAllScreens();
-    dom.missionList.innerHTML = '';
-    for (const m of MISSION_DATA) {
-      const locked = m.id > Game.progress.unlocked;
-      const done = Game.progress.completed.includes(m.id);
-      const card = document.createElement('div');
-      card.className = `mission-card ${locked ? 'locked' : ''}`;
-      card.innerHTML = `<div><h3>${m.id}. ${m.title} ${done ? '✅' : ''}</h3><p>${m.description}<br><small>Ricompensa: € ${m.rewardMoney} · XP ${m.rewardXp}</small></p></div>`;
-      const btn = document.createElement('button');
-      btn.className = 'menu-btn primary';
-      btn.textContent = locked ? 'Bloccata' : 'Avvia';
-      btn.disabled = locked;
-      btn.addEventListener('click', () => startMission(m.id));
-      card.appendChild(btn);
-      dom.missionList.appendChild(card);
-    }
-    setScreen('missionMenu', true);
-  }
-
-  function openProgressMenu() {
-    hideAllScreens();
-    const rank = getRank(Game.progress.xp).name;
-    const completed = Game.progress.completed.length ? Game.progress.completed.map(id => `Missione ${id}`).join(', ') : 'nessuna';
-    dom.progressDetails.innerHTML = `
-      <p><b>Grado:</b> ${rank}</p>
-      <p><b>Soldi:</b> € ${Game.progress.money}</p>
-      <p><b>Esperienza:</b> XP ${Game.progress.xp}</p>
-      <p><b>Missioni sbloccate:</b> ${Game.progress.unlocked}/6</p>
-      <p><b>Missioni completate:</b> ${completed}</p>
-    `;
-    setScreen('progressMenu', true);
-  }
-
-  function resetProgress() {
-    if (!confirm('Vuoi davvero cancellare soldi, XP e missioni sbloccate?')) return;
-    Game.progress = defaultProgress();
-    saveProgress();
-    toast('Progressi azzerati.');
-    openProgressMenu();
-  }
-
-  function startMission(id) {
-    const mission = MISSION_DATA.find(m => m.id === id) || MISSION_DATA[0];
-    if (mission.id > Game.progress.unlocked) return;
-    Game.activeMissionId = mission.id;
-    Game.activeMission = mission;
-    Game.stepIndex = 0;
-    Game.stepProgress = 0;
-    Game.timer = mission.timeLimit;
-    Game.failures = 0;
-    Game.hp = 100;
-    Game.stamina = 100;
-    Game.hasTools = false;
-    Game.carryingSleeper = false;
-    Game.carryingBundle = false;
-    Game.state = 'playing';
-    Game.mode = 'foot';
-    Game.vehicle = null;
-    vehicles.loader.hasLoad = false;
-    vehicles.loader.group.position.set(-13.5, 0, 2.5);
-    vehicles.loader.group.rotation.y = Math.PI / 2;
-    vehicles.tamper.group.position.set(0, 0, -50);
-    vehicles.tamper.group.rotation.y = 0;
-    vehicles.tamper.tamping = false;
-    player.position.set(3.5, 0, -36);
-    player.visible = true;
-    clearCarryVisual();
-    objects.get('material_bundle').visible = true;
-    objects.get('broken_sleeper').visible = true;
-    objects.get('broken_sleeper').material = mats.sleeperBad;
-    hideAllScreens();
-    dom.hud.classList.remove('hidden');
-    updateActiveMarker();
-    updateHUD();
-    toast(`Missione avviata: ${mission.title}`);
-  }
-
-  function pauseGame() {
-    if (Game.state !== 'playing') return;
-    Game.state = 'paused';
-    setScreen('pauseMenu', true);
-    if (document.pointerLockElement) document.exitPointerLock();
-  }
-
-  function resumeGame() {
-    Game.state = 'playing';
-    setScreen('pauseMenu', false);
-  }
-
-  function exitToMain() {
-    Game.state = 'menu';
-    dom.hud.classList.add('hidden');
-    hideAllScreens();
-    setScreen('mainMenu', true);
-    if (document.pointerLockElement) document.exitPointerLock();
-  }
-
-  function completeMission() {
-    const m = Game.activeMission;
-    Game.state = 'result';
-    AudioFx.success();
-    if (!Game.progress.completed.includes(m.id)) {
-      Game.progress.completed.push(m.id);
-      Game.progress.money += m.rewardMoney;
-      Game.progress.xp += m.rewardXp;
-      Game.progress.unlocked = Math.max(Game.progress.unlocked, Math.min(m.id + 1, MISSION_DATA.length));
-      saveProgress();
-    }
-    clearMarkers();
-    dom.hud.classList.add('hidden');
-    hideAllScreens();
-    dom.resultTitle.textContent = 'Missione completata';
-    dom.resultTitle.style.color = '#43dd83';
-    dom.resultText.textContent = `Hai completato: ${m.title}. Lavoro registrato in sicurezza.`;
-    dom.resultReward.textContent = `+ € ${m.rewardMoney} · + XP ${m.rewardXp}`;
-    dom.btnNextMission.classList.toggle('hidden', m.id >= MISSION_DATA.length);
-    setScreen('resultMenu', true);
-    if (document.pointerLockElement) document.exitPointerLock();
-  }
-
-  function failMission(reason) {
-    Game.state = 'result';
-    AudioFx.fail();
-    clearMarkers();
-    dom.hud.classList.add('hidden');
-    hideAllScreens();
-    dom.resultTitle.textContent = 'Missione fallita';
-    dom.resultTitle.style.color = '#ff6960';
-    dom.resultText.textContent = reason;
-    dom.resultReward.textContent = 'Nessuna ricompensa';
-    dom.btnNextMission.classList.add('hidden');
-    setScreen('resultMenu', true);
-    if (document.pointerLockElement) document.exitPointerLock();
-  }
-
-  function currentStep() {
-    return Game.activeMission?.steps[Game.stepIndex] || null;
-  }
-
-  function nextStep() {
-    AudioFx.success();
-    Game.stepIndex++;
-    Game.stepProgress = 0;
-    if (Game.stepIndex >= Game.activeMission.steps.length) {
-      completeMission();
-    } else {
-      const step = currentStep();
-      updateActiveMarker();
-      toast(step.text);
-      updateHUD();
-    }
-  }
-
-  function getTargetObject(step = currentStep()) {
-    return step?.target ? objects.get(step.target) : null;
-  }
-
-  function objectWorldPosition(obj) {
-    if (!obj) return new THREE.Vector3();
-    return obj.getWorldPosition(tempVec).clone();
-  }
-
-  function nearTarget(step = currentStep(), radius = 2.4) {
-    const obj = getTargetObject(step);
-    if (!obj) return false;
-    const p = objectWorldPosition(obj);
-    const actor = activeActor();
-    return dist2D(actor.position, p) <= radius;
-  }
-
-  function activeActor() {
-    if (Game.mode === 'loader') return vehicles.loader.group;
-    if (Game.mode === 'tamper') return vehicles.tamper.group;
-    return player;
-  }
-
-  function handlePrimaryAction() {
-    if (Game.state !== 'playing') return;
-    const step = currentStep();
-    if (!step) return;
-    const validDistance = nearTarget(step, step.kind.includes('Switch') ? 3.0 : 2.6);
-
-    if (Game.mode !== 'foot' && ['inspect','pickupTools','reach','removeFasteners','removeSleeper','pickupSleeper','placeSleeper','confirmWork','inspectSwitch','fixBallast','fixSwitchSleeper','confirmSwitch','confirmFinal'].includes(step.kind)) {
-      toast('Scendi dal mezzo per fare questa operazione.');
-      return;
-    }
-
-    switch (step.kind) {
-      case 'inspect':
-      case 'inspectSwitch':
-        requireNear(validDistance, () => { AudioFx.clank(); toast('Difetto registrato.'); nextStep(); });
-        break;
-      case 'pickupTools':
-        requireNear(validDistance, () => { Game.hasTools = true; AudioFx.clank(); toast('Attrezzi presi dal deposito.'); nextStep(); });
-        break;
-      case 'removeFasteners':
-        requireNear(validDistance, () => {
-          if (!Game.hasTools) return toast('Ti servono gli attrezzi dal deposito.');
-          workWithProgress(1.25, () => { objects.get('broken_sleeper').material = mats.ballastDark; toast('Attacchi rimossi.'); nextStep(); });
-        });
-        break;
-      case 'removeSleeper':
-        requireNear(validDistance, () => workWithProgress(1.6, () => { objects.get('broken_sleeper').visible = false; toast('Traversina danneggiata estratta.'); nextStep(); }));
-        break;
-      case 'pickupSleeper':
-        requireNear(validDistance, () => { Game.carryingSleeper = true; createCarrySleeper(); toast('Nuova traversina presa.'); nextStep(); });
-        break;
-      case 'placeSleeper':
-        requireNear(validDistance, () => {
-          if (!Game.carryingSleeper) return toast('Prima devi prendere una traversina nuova.');
-          Game.carryingSleeper = false;
-          clearCarryVisual();
-          const b = objects.get('broken_sleeper');
-          b.visible = true;
-          b.material = mats.concrete;
-          toast('Traversina nuova posizionata.');
-          nextStep();
-        });
-        break;
-      case 'confirmWork':
-      case 'confirmSwitch':
-      case 'confirmFinal':
-        requireNear(validDistance, () => workWithProgress(1.2, () => { toast('Controllo finale completato.'); nextStep(); }));
-        break;
-      case 'fixBallast':
-        requireNear(validDistance, () => workWithProgress(1.4, () => { objects.get('switch_ballast').material = mats.ballast; toast('Ballast sistemato.'); nextStep(); }));
-        break;
-      case 'fixSwitchSleeper':
-        requireNear(validDistance, () => workWithProgress(1.5, () => { objects.get('switch_sleeper').material = mats.concrete; toast('Traversina scambio sistemata.'); nextStep(); }));
-        break;
-      case 'loaderPick':
-      case 'loaderDrop':
-      case 'tampCycle':
-        handleVehicleUse();
-        break;
-      default:
-        toast('Segui l’obiettivo indicato dal marker.');
-    }
-  }
-
-  function requireNear(ok, cb) {
-    if (!ok) {
-      wrongAction('Sei fuori posizione. Avvicinati al marker.');
-      return;
-    }
-    cb();
-  }
-
-  function wrongAction(message) {
-    Game.failures++;
-    Game.hp = clamp(Game.hp - 8, 0, 100);
-    toast(message);
-    AudioFx.fail();
-    if (Game.activeMissionId === 5 && Game.failures >= 3) failMission('Hai lavorato troppe volte fuori dalla zona autorizzata dello scambio.');
-    if (Game.hp <= 0) failMission('Sicurezza insufficiente: troppi errori operativi.');
-  }
-
-  function workWithProgress(seconds, done) {
-    if (Game.stamina < 12) return toast('Stamina troppo bassa. Fermati un attimo.');
-    Game.stepProgress += 1 / (seconds * 6);
-    Game.stamina = clamp(Game.stamina - 3.8, 0, 100);
-    AudioFx.clank();
-    if (Game.stepProgress >= 1) done();
-  }
-
-  function handleBoardOrExit() {
-    if (Game.state !== 'playing') return;
-    if (Game.mode !== 'foot') {
-      const v = Game.vehicle;
-      const g = vehicles[v].group;
-      player.position.set(g.position.x + 1.8, 0, g.position.z + 1.2);
-      player.visible = true;
-      Game.mode = 'foot';
-      Game.vehicle = null;
-      toast('Sei sceso dal mezzo.');
-      return;
-    }
-    const loaderNear = dist2D(player.position, vehicles.loader.group.position) < 3.0;
-    const tamperNear = dist2D(player.position, vehicles.tamper.group.position) < 3.3;
-    const step = currentStep();
-
-    if (loaderNear) {
-      player.visible = false;
-      Game.mode = 'loader';
-      Game.vehicle = 'loader';
-      toast('Sei salito sul caricatore gomma-rotaia.');
-      if (step?.kind === 'boardLoader') nextStep();
-      return;
-    }
-    if (tamperNear) {
-      player.visible = false;
-      Game.mode = 'tamper';
-      Game.vehicle = 'tamper';
-      toast('Sei salito sulla rincalzatrice.');
-      if (step?.kind === 'boardTamper') nextStep();
-      return;
-    }
-    toast('Non sei vicino a un mezzo.');
-  }
-
-  function handleVehicleUse() {
-    if (Game.state !== 'playing') return;
-    const step = currentStep();
-    if (!step) return;
-    if (step.kind === 'loaderPick') {
-      if (Game.mode !== 'loader') return toast('Devi essere sul caricatore.');
-      if (!nearTarget(step, 4.0)) return wrongAction('Avvicina il caricatore al materiale.');
-      if (vehicles.loader.hasLoad) return toast('Hai già materiale sul caricatore.');
-      vehicles.loader.hasLoad = true;
-      Game.carryingBundle = true;
-      objects.get('material_bundle').visible = false;
-      createLoaderLoad();
-      animateLoaderArm();
-      toast('Materiale caricato.');
-      nextStep();
-      return;
-    }
-    if (step.kind === 'loaderDrop') {
-      if (Game.mode !== 'loader') return toast('Devi essere sul caricatore.');
-      if (!vehicles.loader.hasLoad) return toast('Non hai materiale caricato.');
-      if (!nearTarget(step, 4.0)) return wrongAction('Rilascia il materiale dentro la zona evidenziata.');
-      vehicles.loader.hasLoad = false;
-      Game.carryingBundle = false;
-      clearCarryVisual();
-      const p = objectWorldPosition(getTargetObject(step));
-      const placed = makeBox(2.6, 0.28, 0.75, mats.concrete, p.x, 0.25, p.z);
-      scene.add(placed);
-      animateLoaderArm();
-      toast('Materiale rilasciato correttamente.');
-      nextStep();
-      return;
-    }
-    if (step.kind === 'tampCycle') {
-      if (Game.mode !== 'tamper') return toast('Devi essere sulla rincalzatrice.');
-      if (!nearTarget(step, 2.6)) return wrongAction('Allinea meglio la rincalzatrice al punto di rincalzatura.');
-      const v = vehicles.tamper;
-      v.tamping = true;
-      v.tampStart = now();
-      Game.stepProgress += 0.018;
-      Game.stamina = clamp(Game.stamina - 0.4, 0, 100);
-      AudioFx.noise(0.08, 0.035);
-      if (Game.stepProgress >= 1) {
-        v.tamping = false;
-        toast('Ciclo di rincalzatura completato.');
-        nextStep();
-      }
-      return;
-    }
-    toast('Nessuna funzione mezzo richiesta in questo step.');
-  }
-
-  function animateLoaderArm() {
-    loaderArmAnim = 1;
-    AudioFx.clank();
-  }
-
-  function createCarrySleeper() {
-    clearCarryVisual();
-    carriedVisual = makeBox(1.2, 0.12, 0.22, mats.concrete, 0, 1.25, 0.45);
-    player.add(carriedVisual);
-  }
-
-  function createLoaderLoad() {
-    clearCarryVisual();
-    carriedVisual = makeBox(1.6, 0.45, 1.0, mats.concrete, 1.9, 0.95, 0);
-    vehicles.loader.group.add(carriedVisual);
-  }
-
-  function clearCarryVisual() {
-    if (!carriedVisual) return;
-    carriedVisual.parent?.remove(carriedVisual);
-    carriedVisual = null;
-  }
-
-  function updateStepAuto() {
-    const step = currentStep();
-    if (!step || Game.state !== 'playing') return;
-    if (step.kind === 'reach' && nearTarget(step, 2.2)) nextStep();
-    if (step.kind === 'driveVehicleToZone') {
-      if (Game.mode !== step.vehicle) return;
-      const radius = step.vehicle === 'tamper' ? 2.2 : 4.0;
-      if (nearTarget(step, radius)) nextStep();
-    }
-  }
-
-  function updateActiveMarker() {
-    clearMarkers();
-    const target = getTargetObject();
-    const marker = target ? markers.get(target.userData.id) : null;
-    if (marker) marker.visible = true;
-  }
-
-  function clearMarkers() {
-    for (const marker of markers.values()) marker.visible = false;
-  }
-
-  function updateMarkers(dt) {
-    for (const [id, marker] of markers.entries()) {
-      if (!marker.visible) continue;
-      const obj = objects.get(id);
-      if (!obj) continue;
-      const p = objectWorldPosition(obj);
-      marker.position.set(p.x, p.y + 0.35 + Math.sin(now() * 4) * 0.12, p.z);
-      marker.rotation.y += dt * 1.5;
-    }
-  }
-
-  function updateInteractHint() {
-    if (Game.state !== 'playing') {
-      dom.interactHint.classList.add('hidden');
-      return;
-    }
-    const step = currentStep();
-    const can = step && (nearTarget(step, 2.8) || (['boardLoader','boardTamper'].includes(step.kind) && dist2D(player.position, getTargetObject(step).position) < 3));
-    dom.interactHint.classList.toggle('hidden', !can);
-    if (can) {
-      let label = 'AZIONE';
-      if (step.kind === 'boardLoader' || step.kind === 'boardTamper') label = 'F / SALI';
-      if (step.kind === 'tampCycle' || step.kind === 'loaderPick' || step.kind === 'loaderDrop') label = 'Q / USA MEZZO';
-      dom.interactHint.textContent = label;
-    }
-  }
-
-  function updatePlayer(dt) {
-    if (Game.mode !== 'foot') return;
-    let f = 0, r = 0;
-    if (Input.keys.w) f += 1;
-    if (Input.keys.s) f -= 1;
-    if (Input.keys.d) r += 1;
-    if (Input.keys.a) r -= 1;
-    if (Input.joystick.active) {
-      f = -Input.joystick.y;
-      r = Input.joystick.x;
-    }
-    const moving = Math.abs(f) + Math.abs(r) > 0.05;
-    const running = (Input.keys.shift || Input.runButton) && Game.stamina > 8 && moving;
-    const speed = running ? 7.2 : 4.0;
-
-    if (moving) {
-      const dir = new THREE.Vector3();
-      camera.getWorldDirection(dir);
-      dir.y = 0;
-      dir.normalize();
-      const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
-      const move = new THREE.Vector3().addScaledVector(dir, f).addScaledVector(right, r);
-      if (move.lengthSq() > 0) move.normalize();
-      player.position.addScaledVector(move, speed * dt);
-      player.position.x = clamp(player.position.x, -55, 55);
-      player.position.z = clamp(player.position.z, -72, 82);
-      const targetRot = Math.atan2(move.x, move.z);
-      player.rotation.y = lerpAngle(player.rotation.y, targetRot, clamp(dt * 10, 0, 1));
-      const walk = now() * (running ? 11 : 7.5);
-      legL.rotation.x = Math.sin(walk) * 0.55;
-      legR.rotation.x = -Math.sin(walk) * 0.55;
-      armL.rotation.x = -Math.sin(walk) * 0.35;
-      armR.rotation.x = Math.sin(walk) * 0.35;
-      player.position.y = Math.abs(Math.sin(walk)) * 0.035;
-      Game.stamina = clamp(Game.stamina - dt * (running ? 15 : 2), 0, 100);
-    } else {
-      legL.rotation.x = lerp(legL.rotation.x, 0, dt * 8);
-      legR.rotation.x = lerp(legR.rotation.x, 0, dt * 8);
-      armL.rotation.x = lerp(armL.rotation.x, 0, dt * 8);
-      armR.rotation.x = lerp(armR.rotation.x, 0, dt * 8);
-      player.position.y = 0;
-      Game.stamina = clamp(Game.stamina + dt * 12, 0, 100);
-    }
-  }
-
-  function lerpAngle(a, b, t) {
-    const diff = Math.atan2(Math.sin(b - a), Math.cos(b - a));
-    return a + diff * t;
-  }
-
-  function updateVehicle(dt) {
-    if (Game.mode === 'loader') updateLoader(dt);
-    if (Game.mode === 'tamper') updateTamper(dt);
-
-    if (loaderArmAnim > 0) {
-      loaderArmAnim = Math.max(0, loaderArmAnim - dt * 1.8);
-      const arm = vehicles.loader.arm;
-      arm.rotation.z = Math.sin(loaderArmAnim * Math.PI) * 0.38;
-    }
-
-    const tamper = vehicles.tamper;
-    if (tamper.tamping) {
-      tampAnim += dt * 36;
-      tamper.tines.position.y = 0.12 + Math.sin(tampAnim) * 0.045;
-      tamper.group.position.x = Math.sin(tampAnim * 0.6) * 0.025;
-      if (now() - tamper.tampStart > 0.18) tamper.tamping = false;
-    } else {
-      tamper.tines.position.y = lerp(tamper.tines.position.y, 0.35, dt * 4);
-      tamper.group.position.x = lerp(tamper.group.position.x, 0, dt * 5);
-    }
-  }
-
-  function inputAxes() {
-    let f = 0, r = 0;
-    if (Input.keys.w) f += 1;
-    if (Input.keys.s) f -= 1;
-    if (Input.keys.d) r += 1;
-    if (Input.keys.a) r -= 1;
-    if (Input.joystick.active) {
-      f = -Input.joystick.y;
-      r = Input.joystick.x;
-    }
-    return { f: clamp(f, -1, 1), r: clamp(r, -1, 1) };
-  }
-
-  function updateLoader(dt) {
-    const v = vehicles.loader;
-    const { f, r } = inputAxes();
-    v.speed = lerp(v.speed, f * 5.2, dt * 2.8);
-    v.group.rotation.y -= r * dt * 1.4;
-    v.group.position.x += Math.sin(v.group.rotation.y) * v.speed * dt;
-    v.group.position.z += Math.cos(v.group.rotation.y) * v.speed * dt;
-    v.group.position.x = clamp(v.group.position.x, -40, 40);
-    v.group.position.z = clamp(v.group.position.z, -65, 80);
-    Game.stamina = clamp(Game.stamina + dt * 6, 0, 100);
-  }
-
-  function updateTamper(dt) {
-    const v = vehicles.tamper;
-    const { f } = inputAxes();
-    v.speed = lerp(v.speed, f * 3.4, dt * 2.2);
-    v.group.position.z += v.speed * dt;
-    v.group.position.z = clamp(v.group.position.z, -58, 74);
-    v.group.position.x = lerp(v.group.position.x, 0, dt * 6); // vincolata al binario.
-    v.group.rotation.y = lerpAngle(v.group.rotation.y, 0, dt * 4);
-    Game.stamina = clamp(Game.stamina + dt * 6, 0, 100);
-  }
-
-  function updateCamera(dt) {
-    const actor = activeActor();
-    const targetY = Game.mode === 'foot' ? 1.35 : 1.9;
-    const d = Input.camera.distance;
-    const phi = Input.camera.phi;
-    const theta = Input.camera.theta;
-    const ideal = new THREE.Vector3(
-      actor.position.x + d * Math.sin(theta) * Math.cos(phi),
-      actor.position.y + targetY + d * Math.sin(phi),
-      actor.position.z + d * Math.cos(theta) * Math.cos(phi)
-    );
-    camera.position.lerp(ideal, clamp(dt * 8, 0, 1));
-    camera.lookAt(actor.position.x, actor.position.y + targetY, actor.position.z);
-  }
-
-  function updateTimer(dt) {
-    if (Game.state !== 'playing') return;
-    Game.timer -= dt;
-    if (Game.timer <= 0) failMission('Tempo scaduto. Il cantiere non è stato liberato in tempo.');
-  }
-
-  function updateHUD() {
-    if (!Game.activeMission) return;
-    const step = currentStep();
-    dom.hpBar.style.width = `${Game.hp}%`;
-    dom.staminaBar.style.width = `${Game.stamina}%`;
-    dom.rankLabel.textContent = getRank(Game.progress.xp).name;
-    dom.moneyLabel.textContent = `€ ${Game.progress.money}`;
-    dom.xpLabel.textContent = `XP ${Game.progress.xp}`;
-    const min = Math.floor(Math.max(0, Game.timer) / 60);
-    const sec = Math.floor(Math.max(0, Game.timer) % 60);
-    dom.timerLabel.textContent = `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-    dom.missionTitle.textContent = `${Game.activeMission.id}. ${Game.activeMission.title}`;
-    dom.missionStep.textContent = step?.text || 'Completata';
-    dom.stepLabel.textContent = `${Math.min(Game.stepIndex + 1, Game.activeMission.steps.length)}/${Game.activeMission.steps.length}`;
-    const base = Game.stepIndex / Game.activeMission.steps.length;
-    const plus = Game.stepProgress / Game.activeMission.steps.length;
-    dom.stepBar.style.width = `${clamp((base + plus) * 100, 0, 100)}%`;
-  }
-
-  function getRank(xp) {
-    let rank = RANKS[0];
-    for (const r of RANKS) if (xp >= r.xp) rank = r;
-    return rank;
-  }
-
-  function updateMinimap() {
-    const ctx = dom.minimap.getContext('2d');
-    const w = dom.minimap.width;
-    const h = dom.minimap.height;
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = 'rgba(12,18,25,.88)';
-    ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = 'rgba(255,255,255,.28)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, w - 2, h - 2);
-    const mapX = x => w / 2 + x * 1.2;
-    const mapZ = z => h / 2 + z * 0.85;
-    ctx.strokeStyle = '#8e969d';
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(mapX(0), mapZ(-70)); ctx.lineTo(mapX(0), mapZ(80)); ctx.stroke();
-    ctx.strokeStyle = '#f6a21a';
-    const actor = activeActor();
-    ctx.beginPath(); ctx.arc(mapX(actor.position.x), mapZ(actor.position.z), 5, 0, Math.PI * 2); ctx.fillStyle = '#f6a21a'; ctx.fill();
-    const target = getTargetObject();
-    if (target) {
-      const p = objectWorldPosition(target);
-      ctx.beginPath(); ctx.arc(mapX(p.x), mapZ(p.z), 5, 0, Math.PI * 2); ctx.fillStyle = '#43dd83'; ctx.fill();
-      ctx.strokeStyle = 'rgba(67,221,131,.65)'; ctx.beginPath(); ctx.moveTo(mapX(actor.position.x), mapZ(actor.position.z)); ctx.lineTo(mapX(p.x), mapZ(p.z)); ctx.stroke();
-    }
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 11px system-ui';
-    ctx.fillText('N', w / 2 - 4, 14);
-  }
-
-  function toast(text) {
-    const t = now();
-    if (t - Game.lastToast < 0.15) return;
-    Game.lastToast = t;
-    const el = document.createElement('div');
-    el.className = 'toast';
-    el.textContent = text;
-    dom.notificationStack.appendChild(el);
-    setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(-6px)'; }, 2500);
-    setTimeout(() => el.remove(), 3000);
-  }
-
-  function onResize() {
-    camera.aspect = innerWidth / innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(innerWidth, innerHeight);
-  }
-
-  function loop() {
-    requestAnimationFrame(loop);
-    const dt = Math.min(clock.getDelta(), 0.05);
-    if (Game.state === 'playing') {
-      updateTimer(dt);
-      updatePlayer(dt);
-      updateVehicle(dt);
-      updateCamera(dt);
-      updateStepAuto();
-      updateMarkers(dt);
-      updateInteractHint();
-      updateHUD();
-      updateMinimap();
-    } else {
-      updateCamera(dt);
-    }
-    renderer.render(scene, camera);
-  }
-
-  function bootstrap() {
-    initDOM();
-    initThree();
-    createMaterials();
-    initWorld();
-    setupInputs();
-    openProgressMenu();
-    setScreen('progressMenu', false);
-    setScreen('mainMenu', true);
-    Input.camera.distance = Number(dom.cameraDistance.value);
-    loop();
-  }
-
-  bootstrap();
-})();
+/* MENU */
+.screen{
+  position:fixed;
+  inset:0;
+  z-index:100;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  color:#fff;
+  background:radial-gradient(circle at top,#20394a 0%,#071018 72%);
+}
+.card{
+  width:min(760px,96vw);
+  max-height:92vh;
+  overflow:auto;
+  padding:26px;
+  border-radius:22px;
+  background:rgba(10,16,23,.94);
+  border:2px solid #f6a21a;
+  box-shadow:0 20px 60px rgba(0,0,0,.55);
+  text-align:center;
+}
+.card.small{
+  width:min(430px,96vw);
+}
+.card.left{
+  text-align:left;
+}
+h1{
+  margin:0 0 12px;
+  color:#f6a21a;
+  font-size:clamp(2.5rem,8vw,4.5rem);
+  letter-spacing:.08em;
+  line-height:.95;
+  text-shadow:0 0 20px rgba(246,162,26,.45);
+}
+h2{
+  margin:0 0 16px;
+  color:#f6a21a;
+  font-size:clamp(1.7rem,5vw,2.3rem);
+}
+.subtitle{
+  color:#d2dae3;
+  font-size:1.05rem;
+  line-height:1.45;
+}
+.btn{
+  display:block;
+  width:min(330px,100%);
+  min-height:50px;
+  margin:9px auto;
+  padding:10px 16px;
+  border:2px solid #f6a21a;
+  border-radius:14px;
+  background:rgba(255,255,255,.04);
+  color:#fff;
+  font-weight:900;
+  font-size:1rem;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.btn.primary{
+  background:#f6a21a;
+  color:#111;
+}
+.btn.danger{
+  border-color:#ff5b54;
+  color:#ffbbb8;
+}
+.btn:disabled{
+  opacity:.4;
+}
+.btn:active{
+  transform:scale(.97);
+}
+.mission-list{
+  display:grid;
+  gap:12px;
+  margin:18px 0;
+}
+.mission-card{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:12px;
+  align-items:center;
+  text-align:left;
+  padding:14px;
+  border-radius:16px;
+  background:rgba(255,255,255,.055);
+  border:1px solid rgba(255,255,255,.12);
+  border-left:5px solid #f6a21a;
+}
+.mission-card.locked{
+  opacity:.5;
+  border-left-color:#707985;
+}
+.mission-card h3{
+  margin:0 0 4px;
+}
+.mission-card p{
+  margin:0;
+  color:#c4ced8;
+  line-height:1.35;
+}
+.mission-card button{
+  width:120px;
+  margin:0;
+}
+
+/* HUD */
+#hud{
+  position:fixed;
+  inset:0;
+  z-index:40;
+  pointer-events:none;
+  padding:calc(env(safe-area-inset-top) + 12px) 14px 14px;
+  color:#fff;
+}
+.hud-top{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+}
+.hud-card{
+  background:rgba(13,22,32,.80);
+  border:1px solid rgba(255,255,255,.14);
+  backdrop-filter:blur(8px);
+  border-radius:16px;
+  padding:10px 12px;
+  box-shadow:0 10px 30px rgba(0,0,0,.32);
+}
+.hud-left{
+  min-width:min(420px,62vw);
+  border-left:4px solid #f6a21a;
+}
+.hud-right{
+  min-width:150px;
+  text-align:right;
+  border-right:4px solid #f6a21a;
+  font-weight:900;
+}
+.stat{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin:5px 0;
+}
+.stat span{
+  width:42px;
+  color:#cbd5df;
+  font-size:.78rem;
+  font-weight:900;
+}
+.bar{
+  width:155px;
+  height:9px;
+  background:rgba(255,255,255,.16);
+  border-radius:99px;
+  overflow:hidden;
+}
+.bar i{
+  display:block;
+  height:100%;
+  width:100%;
+  background:#ef4d45;
+}
+#stamina-bar{
+  background:#3498db;
+}
+.hint-line{
+  margin-top:7px;
+  color:#c7d0da;
+  font-size:.76rem;
+}
+.money{
+  color:#43dd83;
+  font-size:1.15rem;
+}
+.xp{
+  color:#b7d8ff;
+}
+.timer{
+  color:#ff6960;
+  font-size:1.25rem;
+}
+#pause-btn{
+  position:fixed;
+  top:calc(env(safe-area-inset-top) + 15px);
+  left:50%;
+  transform:translateX(-50%);
+  z-index:44;
+  pointer-events:auto;
+  border:0;
+  border-radius:99px;
+  padding:8px 16px;
+  background:rgba(13,22,32,.82);
+  border:1px solid rgba(255,255,255,.14);
+  color:#fff;
+  font-weight:900;
+}
+.objective{
+  position:fixed;
+  left:50%;
+  bottom:max(18px,env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  width:min(720px,calc(100vw - 28px));
+  padding:14px 16px;
+  background:rgba(13,22,32,.86);
+  border:1px solid rgba(255,255,255,.14);
+  border-bottom:4px solid #f6a21a;
+  border-radius:18px;
+  box-shadow:0 14px 34px rgba(0,0,0,.38);
+}
+.objective-title{
+  color:#f6a21a;
+  font-size:.9rem;
+  font-weight:950;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.objective-step{
+  margin-top:5px;
+  line-height:1.25;
+}
+.objective-progress{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:9px;
+  color:#cbd5df;
+  font-size:.78rem;
+  font-weight:900;
+}
+.objective-progress div{
+  flex:1;
+  height:7px;
+  background:rgba(255,255,255,.14);
+  border-radius:99px;
+  overflow:hidden;
+}
+.objective-progress i{
+  display:block;
+  height:100%;
+  width:0%;
+  background:#f6a21a;
+}
+#toast-stack{
+  position:fixed;
+  left:50%;
+  top:19%;
+  transform:translateX(-50%);
+  width:min(540px,calc(100vw - 32px));
+  display:grid;
+  gap:8px;
+}
+.toast{
+  padding:12px 16px;
+  text-align:center;
+  border-radius:14px;
+  background:rgba(0,0,0,.80);
+  border:1px solid #f6a21a;
+  box-shadow:0 12px 30px rgba(0,0,0,.38);
+  color:#fff;
+  font-weight:900;
+}
+#interact-hint{
+  position:fixed;
+  left:50%;
+  top:58%;
+  transform:translate(-50%,-50%);
+  padding:10px 18px;
+  border-radius:99px;
+  background:rgba(0,0,0,.74);
+  border:2px solid #fff;
+  color:#fff;
+  font-weight:950;
+  letter-spacing:.08em;
+}
+#minimap{
+  position:fixed;
+  right:16px;
+  bottom:118px;
+  width:140px;
+  height:140px;
+  border-radius:18px;
+  background:rgba(13,22,32,.82);
+  border:1px solid rgba(255,255,255,.16);
+}
+
+/* MOBILE */
+#mobile-controls{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  height:270px;
+  z-index:55;
+  pointer-events:none;
+  display:none;
+}
+body.playing #mobile-controls{
+  display:block;
+}
+.joy-zone{
+  position:absolute;
+  left:max(20px,env(safe-area-inset-left));
+  bottom:max(24px,env(safe-area-inset-bottom));
+  width:145px;
+  height:145px;
+  border-radius:50%;
+  background:rgba(255,255,255,.14);
+  border:2px solid rgba(255,255,255,.27);
+  pointer-events:auto;
+}
+.joy-knob{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:62px;
+  height:62px;
+  border-radius:50%;
+  background:rgba(246,162,26,.8);
+  transform:translate(-50%,-50
