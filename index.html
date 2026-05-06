@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Armamento Ferroviario</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #2c3e50; color: #ecf0f1; }
+h1, h2, h3 { margin-top: 0; }
+.app-container { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem; background: radial-gradient(circle at center, #34495e 0%, #2c3e50 100%); }
+.menu-title { font-size: 3rem; text-transform: uppercase; letter-spacing: 2px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin-bottom: 2rem; color: #f1c40f; text-align: center; }
+.menu-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); width: 100%; max-width: 900px; }
+.menu-button { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; font-size: 1.2rem; font-weight: bold; cursor: pointer; background-color: #ecf0f1; color: #2c3e50; border: 4px solid #bdc3c7; border-radius: 12px; transition: all 0.2s ease-in-out; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+.menu-button:hover { transform: translateY(-5px); box-shadow: 0 8px 12px rgba(0,0,0,0.4); background-color: #fff; border-color: #f1c40f; }
+.menu-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+.game-container { background-color: rgba(255, 255, 255, 0.95); color: #333; border-radius: 16px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); padding: 2rem; max-width: 700px; width: 100%; text-align: center; animation: slideIn 0.3s ease-out; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.game-title { color: #2c3e50; border-bottom: 3px solid #f1c40f; padding-bottom: 1rem; margin-bottom: 2rem; }
+.step-container { margin: 2rem 0; padding: 2rem; border-radius: 12px; background-color: #f8f9fa; border: 3px dashed #bdc3c7; position: relative; overflow: hidden; }
+.step-icon { font-size: 4rem; margin-bottom: 1rem; display: inline-block; animation: bounce 2s infinite; }
+@keyframes bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-15px); } 60% { transform: translateY(-7px); } }
+.action-button { padding: 1rem 2rem; font-size: 1.2rem; font-weight: bold; text-transform: uppercase; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s, transform 0.1s; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+.action-button:active { transform: translateY(2px); box-shadow: 0 2px 3px rgba(0,0,0,0.2); }
+.progress-dots { margin-top: 2rem; display: flex; justify-content: center; gap: 8px; }
+.dot { width: 16px; height: 16px; border-radius: 50%; transition: background-color 0.3s; }
+.back-button { padding: 0.8rem 1.5rem; cursor: pointer; background-color: #7f8c8d; color: white; border: none; border-radius: 8px; font-weight: bold; transition: background-color 0.2s; margin-top: 1rem; }
+.back-button:hover { background-color: #95a5a6; }
+.finished-container { margin: 2rem 0; padding: 3rem 2rem; border: 4px solid #27ae60; border-radius: 12px; background-color: #eafaf1; animation: pulseSuccess 1.5s infinite alternate; }
+@keyframes pulseSuccess { from { box-shadow: 0 0 10px rgba(39, 174, 96, 0.4); } to { box-shadow: 0 0 20px rgba(39, 174, 96, 0.8); } }
+.finished-icon { font-size: 5rem; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState } = React;
+
+    function MainMenu({ onSelectOperation }) {
+      const operations = [
+        { id: 'saldatura', name: 'Saldatura Alluminotermica', icon: '🔥' },
+        { id: 'sostituzione_traversine', name: 'Sostituzione Traversine', icon: '🪵' },
+        { id: 'lrs', name: 'Regolazione LRS', icon: '📏' },
+        { id: 'cambio_rotaie', name: 'Cambio Rotaie', icon: '🏗️' },
+        { id: 'varo_deviatoio', name: 'Varo Deviatoio', icon: '🔀' },
+        { id: 'varo_campate', name: 'Varo Campate', icon: '🛤️' },
+      ];
+
+      return (
+        <div style={{ textAlign: 'center' }}>
+          <h1 className="menu-title">Armamento Ferroviario</h1>
+          <p style={{ fontSize: '1.5rem', marginBottom: '3rem', color: '#bdc3c7' }}>Seleziona una missione operativa</p>
+          <div className="menu-grid">
+            {operations.map(op => (
+              <button key={op.id} className="menu-button" onClick={() => onSelectOperation(op.id)}>
+                <span className="menu-icon">{op.icon}</span><span>{op.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function SaldaturaAlluminotermica({ onBack }) {
+      const steps = [
+        { id: 1, name: 'Allineamento', desc: 'Allinea perfettamente i due monconi.', icon: '📏' },
+        { id: 2, name: 'Posa stampo', desc: 'Posiziona lo stampo refrattario.', icon: '🧱' },
+        { id: 3, name: 'Lutatura', desc: 'Sigilla lo stampo con la pasta.', icon: '🧽' },
+        { id: 4, name: 'Preriscaldo', desc: 'Riscalda le rotaie col cannello.', icon: '🔥' },
+        { id: 5, name: 'Colata', desc: 'Innesca la reazione e versa il metallo.', icon: '🌋' },
+        { id: 6, name: 'Sbavatura', desc: 'Rimuovi il materiale in eccesso a caldo.', icon: '⛏️' },
+        { id: 7, name: 'Molatura', desc: 'Rifinisci il profilo della rotaia.', icon: '✨' }
+      ];
+      const [currentStep, setCurrentStep] = useState(0);
+      const isFinished = currentStep === steps.length;
+      return (
+        <div className="game-container">
+          <h2 className="game-title">🔥 Saldatura Alluminotermica</h2>
+          {!isFinished ? (
+            <div className="step-container" style={{ borderColor: '#e74c3c' }}>
+              <div className="step-icon">{steps[currentStep].icon}</div>
+              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
+              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
+              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#e74c3c' }}>Esegui Azione</button>
+              <div className="progress-dots">
+                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#e74c3c' : '#bdc3c7' }} />)}
+              </div>
+            </div>
+          ) : (
+            <div className="finished-container">
+              <div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Saldatura Completata!</h3>
+            </div>
+          )}
+          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
+        </div>
+      );
+    }
+
+    function SostituzioneTraversine({ onBack }) {
+      const steps = [
+        { id: 1, name: 'Rimozione Attacchi', desc: 'Allenta e rimuovi i sistemi di attacco.', icon: '🔧' },
+        { id: 2, name: 'Sconciamento', desc: 'Rimuovi il pietrisco attorno alla traversina.', icon: '🪨' },
+        { id: 3, name: 'Estrazione', desc: 'Estrai la vecchia traversina da sotto.', icon: '🪵' },
+        { id: 4, name: 'Inserimento', desc: 'Infila la nuova traversina.', icon: '📏' },
+        { id: 5, name: 'Ripristino Attacchi', desc: 'Rimonta e serra i sistemi di attacco.', icon: '🔩' },
+        { id: 6, name: 'Rincalzatura', desc: 'Compatta nuovo pietrisco.', icon: '🚜' }
+      ];
+      const [currentStep, setCurrentStep] = useState(0);
+      const isFinished = currentStep === steps.length;
+      return (
+        <div className="game-container">
+          <h2 className="game-title">🪵 Sostituzione Traversine</h2>
+          {!isFinished ? (
+            <div className="step-container" style={{ borderColor: '#f39c12' }}>
+              <div className="step-icon">{steps[currentStep].icon}</div>
+              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
+              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
+              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#f39c12' }}>Esegui Azione</button>
+              <div className="progress-dots">
+                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#f39c12' : '#bdc3c7' }} />)}
+              </div>
+            </div>
+          ) : (
+            <div className="finished-container"><div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Sostituzione Completata!</h3></div>
+          )}
+          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
+        </div>
+      );
+    }
+
+    function RegolazioneLRS({ onBack }) {
+      const steps = [
+        { id: 1, name: 'Misurazione', desc: 'Rileva la temperatura della rotaia.', icon: '🌡️' },
+        { id: 2, name: 'Svincolo', desc: 'Allenta tutti gli organi di attacco.', icon: '🔧' },
+        { id: 3, name: 'Battitura', desc: 'Batti la rotaia per favorire lo scorrimento.', icon: '🔨' },
+        { id: 4, name: 'Trazionamento', desc: 'Applica i tenditori idraulici.', icon: '⚙️' },
+        { id: 5, name: 'Fissaggio', desc: 'Serra nuovamente gli attacchi in tensione.', icon: '🔩' },
+        { id: 6, name: 'Saldatura', desc: 'Esegui l\'ultima saldatura alluminotermica.', icon: '🔥' }
+      ];
+      const [currentStep, setCurrentStep] = useState(0);
+      const isFinished = currentStep === steps.length;
+      return (
+        <div className="game-container">
+          <h2 className="game-title">📏 Regolazione L.R.S.</h2>
+          {!isFinished ? (
+            <div className="step-container" style={{ borderColor: '#9b59b6' }}>
+              <div className="step-icon">{steps[currentStep].icon}</div>
+              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
+              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
+              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#9b59b6' }}>Esegui Azione</button>
+              <div className="progress-dots">
+                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#9b59b6' : '#bdc3c7' }} />)}
+              </div>
+            </div>
+          ) : (
+            <div className="finished-container"><div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Regolazione Completata!</h3></div>
+          )}
+          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
+        </div>
+      );
+    }
+
+    function CambioRotaie({ onBack }) {
+      const steps = [
+        { id: 1, name: 'Svincolo', desc: 'Rimuovi tutti gli organi di attacco.', icon: '🔧' },
+        { id: 2, name: 'Piazzamento', desc: 'Posiziona il caricatore strada-rotaia.', icon: '🚜' },
+        { id: 3, name: 'Rimozione', desc: 'Usa la pinza per rimuovere la vecchia rotaia.', icon: '🏗️' },
+        { id: 4, name: 'Posa Nuova', desc: 'Adagia la nuova rotaia sulle selle.', icon: '🛤️' },
+        { id: 5, name: 'Fissaggio', desc: 'Serra nuovamente i sistemi di attacco.', icon: '🔩' }
+      ];
+      const [currentStep, setCurrentStep] = useState(0);
+      const isFinished = currentStep === steps.length;
+      return (
+        <div className="game-container">
+          <h2 className="game-title">🏗️ Cambio Rotaie</h2>
+          {!isFinished ? (
+            <div className="step-container" style={{ borderColor: '#3498db' }}>
+              <div className="step-icon">{steps[currentStep].icon}</div>
+              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
+              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
+              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#3498db' }}>Esegui Azione</button>
+              <div className="progress-dots">
+                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#3498db' : '#bdc3c7' }} />)}
+              </div>
+            </div>
+          ) : (
+            <div className="finished-container"><div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Cambio Completato!</h3></div>
+          )}
+          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
+        </div>
+      );
+    }
+
+    function VaroDeviatoio({ onBack }) {
+      const steps = [
+        { id: 1, name: 'Piano Posa', desc: 'Livella e compatta lo strato di ballast.', icon: '🚜' },
+        { id: 2, name: 'Portali', desc: 'Monta e posiziona i portali idraulici.', icon: '🏗️' },
+        { id: 3, name: 'Sollevamento', desc: 'Solleva il telaio del deviatoio.', icon: '⏫' },
+        { id: 4, name: 'Traslazione', desc: 'Sposta il deviatoio sulla posizione finale.', icon: '➡️' },
+        { id: 5, name: 'Posa', desc: 'Abbassa il deviatoio in posizione.', icon: '⏬' },
+        { id: 6, name: 'Giunzioni', desc: 'Esegui le saldature per collegare il deviatoio.', icon: '📐' }
+      ];
+      const [currentStep, setCurrentStep] = useState(0);
+      const isFinished = currentStep === steps.length;
+      return (
+        <div className="game-container">
+          <h2 className="game-title">🔀 Varo Deviatoio</h2>
+          {!isFinished ? (
+            <div className="step-container" style={{ borderColor: '#e67e22' }}>
+              <div className="step-icon">{steps[currentStep].icon}</div>
+              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
+              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
+              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#e67e22' }}>Esegui Azione</button>
+              <div className="progress-dots">
+                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#e67e22' : '#bdc3c7' }} />)}
+              </div>
+            </div>
+          ) : (
+            <div className="finished-container"><div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Varo Completato!</h3></div>
+          )}
+          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
+        </div>
+      );
+    }
+
+    function VaroCampate({ onBack }) {
+      const steps = [
+        { id: 1, name: 'Trasporto', desc: 'Sposta il treno cantiere con le campate.', icon: '🚂' },
+        { id: 2, name: 'Aggancio', desc: 'Usa la gru per agganciare in sicurezza i binari.', icon: '🪝' },
+        { id: 3, name: 'Sollevamento', desc: 'Solleva la campata dal vagone.', icon: '🏗️' },
+        { id: 4, name: 'Allineamento', desc: 'Avanza e allinea la nuova campata.', icon: '🎯' },
+        { id: 5, name: 'Posa', desc: 'Abbassa la campata sulla massicciata.', icon: '🛤️' },
+        { id: 6, name: 'Steccatura', desc: 'Applica ganasce e bulloni.', icon: '🔩' }
+      ];
+      const [currentStep, setCurrentStep] = useState(0);
+      const isFinished = currentStep === steps.length;
+      return (
+        <div className="game-container">
+          <h2 className="game-title">🛤️ Varo Campate</h2>
+          {!isFinished ? (
+            <div className="step-container" style={{ borderColor: '#2980b9' }}>
+              <div className="step-icon">{steps[currentStep].icon}</div>
+              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
+              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
+              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#2980b9' }}>Esegui Azione</button>
+              <div className="progress-dots">
+                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#2980b9' : '#bdc3c7' }} />)}
+              </div>
+            </div>
+          ) : (
+            <div className="finished-container"><div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Posa Completata!</h3></div>
+          )}
+          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
+        </div>
+      );
+    }
+
+    function App() {
+      const [currentOperation, setCurrentOperation] = useState(null);
+      const renderGame = () => {
+        switch (currentOperation) {
+          case 'saldatura': return <SaldaturaAlluminotermica onBack={() => setCurrentOperation(null)} />;
+          case 'sostituzione_traversine': return <SostituzioneTraversine onBack={() => setCurrentOperation(null)} />;
+          case 'lrs': return <RegolazioneLRS onBack={() => setCurrentOperation(null)} />;
+          case 'cambio_rotaie': return <CambioRotaie onBack={() => setCurrentOperation(null)} />;
+          case 'varo_deviatoio': return <VaroDeviatoio onBack={() => setCurrentOperation(null)} />;
+          case 'varo_campate': return <VaroCampate onBack={() => setCurrentOperation(null)} />;
+          default: return <div>Lavorazione non trovata</div>;
+        }
+      };
+      return <div className="app-container">{currentOperation === null ? <MainMenu onSelectOperation={setCurrentOperation} /> : renderGame()}</div>;
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
