@@ -1,280 +1,888 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Armamento Ferroviario</title>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>
-body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #2c3e50; color: #ecf0f1; }
-h1, h2, h3 { margin-top: 0; }
-.app-container { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem; background: radial-gradient(circle at center, #34495e 0%, #2c3e50 100%); }
-.menu-title { font-size: 3rem; text-transform: uppercase; letter-spacing: 2px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin-bottom: 2rem; color: #f1c40f; text-align: center; }
-.menu-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); width: 100%; max-width: 900px; }
-.menu-button { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; font-size: 1.2rem; font-weight: bold; cursor: pointer; background-color: #ecf0f1; color: #2c3e50; border: 4px solid #bdc3c7; border-radius: 12px; transition: all 0.2s ease-in-out; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-.menu-button:hover { transform: translateY(-5px); box-shadow: 0 8px 12px rgba(0,0,0,0.4); background-color: #fff; border-color: #f1c40f; }
-.menu-icon { font-size: 3rem; margin-bottom: 0.5rem; }
-.game-container { background-color: rgba(255, 255, 255, 0.95); color: #333; border-radius: 16px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); padding: 2rem; max-width: 700px; width: 100%; text-align: center; animation: slideIn 0.3s ease-out; }
-@keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-.game-title { color: #2c3e50; border-bottom: 3px solid #f1c40f; padding-bottom: 1rem; margin-bottom: 2rem; }
-.step-container { margin: 2rem 0; padding: 2rem; border-radius: 12px; background-color: #f8f9fa; border: 3px dashed #bdc3c7; position: relative; overflow: hidden; }
-.step-icon { font-size: 4rem; margin-bottom: 1rem; display: inline-block; animation: bounce 2s infinite; }
-@keyframes bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-15px); } 60% { transform: translateY(-7px); } }
-.action-button { padding: 1rem 2rem; font-size: 1.2rem; font-weight: bold; text-transform: uppercase; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s, transform 0.1s; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
-.action-button:active { transform: translateY(2px); box-shadow: 0 2px 3px rgba(0,0,0,0.2); }
-.progress-dots { margin-top: 2rem; display: flex; justify-content: center; gap: 8px; }
-.dot { width: 16px; height: 16px; border-radius: 50%; transition: background-color 0.3s; }
-.back-button { padding: 0.8rem 1.5rem; cursor: pointer; background-color: #7f8c8d; color: white; border: none; border-radius: 8px; font-weight: bold; transition: background-color 0.2s; margin-top: 1rem; }
-.back-button:hover { background-color: #95a5a6; }
-.finished-container { margin: 2rem 0; padding: 3rem 2rem; border: 4px solid #27ae60; border-radius: 12px; background-color: #eafaf1; animation: pulseSuccess 1.5s infinite alternate; }
-@keyframes pulseSuccess { from { box-shadow: 0 0 10px rgba(39, 174, 96, 0.4); } to { box-shadow: 0 0 20px rgba(39, 174, 96, 0.8); } }
-.finished-icon { font-size: 5rem; margin-bottom: 1rem; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FERROVIA: ARMAMENTO</title>
+    <style>
+        :root {
+            --primary: #f39c12;
+            --bg-dark: #1a1a2e;
+            --text-light: #e0e0e0;
+            --danger: #e74c3c;
+            --success: #2ecc71;
+            --hud-bg: rgba(26, 26, 46, 0.8);
+        }
+        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: var(--bg-dark); color: var(--text-light); overflow: hidden; }
+        
+        #gameCanvas { display: block; width: 100%; height: 100%; }
+        
+        /* UI Layers */
+        .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; }
+        .pointer-events-auto { pointer-events: auto; }
+        .hidden { display: none !important; }
+        
+        /* Main Menu */
+        #main-menu { background: radial-gradient(circle at center, #2c3e50 0%, #1a1a2e 100%); align-items: center; justify-content: center; z-index: 100; }
+        .title-container { text-align: center; margin-bottom: 40px; }
+        .title-main { font-size: 4rem; color: var(--primary); text-transform: uppercase; letter-spacing: 5px; margin: 0; text-shadow: 0 0 10px rgba(243, 156, 18, 0.5); }
+        .title-sub { font-size: 1.5rem; letter-spacing: 2px; color: #95a5a6; margin-top: 10px; }
+        .menu-btn { background: transparent; border: 2px solid var(--primary); color: var(--text-light); padding: 15px 40px; font-size: 1.2rem; text-transform: uppercase; margin: 10px; cursor: pointer; transition: all 0.2s; width: 300px; position: relative; overflow: hidden; }
+        .menu-btn:hover { background: var(--primary); color: #000; box-shadow: 0 0 15px var(--primary); transform: scale(1.05); }
+        
+        /* HUD */
+        #hud { justify-content: space-between; padding: 20px; z-index: 50; pointer-events: none; }
+        #hud button { pointer-events: auto; }
+        .hud-top { display: flex; justify-content: space-between; }
+        .stats-panel { background: var(--hud-bg); padding: 15px; border-left: 4px solid var(--primary); border-radius: 0 8px 8px 0; backdrop-filter: blur(5px); }
+        .stat-row { display: flex; align-items: center; margin-bottom: 8px; font-weight: bold; }
+        .stat-label { width: 80px; text-transform: uppercase; font-size: 0.8rem; color: #bdc3c7; }
+        .bar-container { width: 150px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; margin-left: 10px; }
+        .bar-fill { height: 100%; transition: width 0.3s ease; }
+        .bar-hp { background: var(--danger); }
+        .bar-sp { background: #3498db; }
+        .bar-xp { background: var(--primary); }
+        
+        .info-panel { background: var(--hud-bg); padding: 15px; border-right: 4px solid var(--primary); border-radius: 8px 0 0 8px; text-align: right; }
+        .rank-text { font-size: 1.2rem; font-weight: bold; color: var(--primary); }
+        .money-text { font-size: 1.1rem; color: var(--success); }
+        
+        .hud-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+        .mission-panel { background: var(--hud-bg); padding: 15px; border-bottom: 4px solid var(--primary); max-width: 400px; border-radius: 8px 8px 0 0; }
+        .mission-title { color: var(--primary); font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
+        .mission-obj { font-size: 0.9rem; }
+        
+        /* Controls */
+        #mobile-controls { display: none; position: absolute; bottom: 20px; left: 20px; width: 150px; height: 150px; border-radius: 50%; background: rgba(255,255,255,0.1); pointer-events: auto; touch-action: none; z-index: 60; }
+        #joystick-knob { position: absolute; top: 50px; left: 50px; width: 50px; height: 50px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .action-btn-mobile { display: none; position: absolute; bottom: 40px; right: 40px; width: 70px; height: 70px; border-radius: 50%; background: var(--primary); color: #000; font-weight: bold; text-align: center; line-height: 70px; pointer-events: auto; z-index: 60; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        
+        @media (max-width: 768px) {
+            #mobile-controls, .action-btn-mobile { display: block; }
+            .menu-btn { width: 80%; }
+            .bar-container { width: 100px; }
+        }
+
+        /* Overlay Screens */
+        .overlay-screen { background: rgba(26,26,46,0.95); z-index: 80; align-items: center; justify-content: center; padding: 20px; }
+        .panel { background: #232338; border: 1px solid #3f3f5a; border-radius: 10px; width: 100%; max-width: 600px; padding: 30px; }
+        .panel h2 { color: var(--primary); border-bottom: 2px solid #3f3f5a; padding-bottom: 10px; margin-top: 0; }
+        .list-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #3f3f5a; }
+        .list-item button { background: var(--primary); color: #000; border: none; padding: 5px 15px; cursor: pointer; border-radius: 3px; font-weight: bold; }
+        
+        /* Notifications */
+        #notification-area { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); text-align: center; z-index: 70; }
+        .notification { background: rgba(0,0,0,0.8); border: 1px solid var(--primary); padding: 10px 20px; border-radius: 5px; margin-bottom: 10px; animation: fadeOut 4s forwards; }
+        @keyframes fadeOut { 0% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-20px); } }
+        
+        /* Day/Night Overlay */
+        #environment-overlay { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 10; mix-blend-mode: multiply; transition: background-color 2s; }
+    </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState } = React;
 
-    function MainMenu({ onSelectOperation }) {
-      const operations = [
-        { id: 'saldatura', name: 'Saldatura Alluminotermica', icon: '🔥' },
-        { id: 'sostituzione_traversine', name: 'Sostituzione Traversine', icon: '🪵' },
-        { id: 'lrs', name: 'Regolazione LRS', icon: '📏' },
-        { id: 'cambio_rotaie', name: 'Cambio Rotaie', icon: '🏗️' },
-        { id: 'varo_deviatoio', name: 'Varo Deviatoio', icon: '🔀' },
-        { id: 'varo_campate', name: 'Varo Campate', icon: '🛤️' },
-      ];
+    <canvas id="gameCanvas"></canvas>
+    <div id="environment-overlay"></div>
 
-      return (
-        <div style={{ textAlign: 'center' }}>
-          <h1 className="menu-title">Armamento Ferroviario</h1>
-          <p style={{ fontSize: '1.5rem', marginBottom: '3rem', color: '#bdc3c7' }}>Seleziona una missione operativa</p>
-          <div className="menu-grid">
-            {operations.map(op => (
-              <button key={op.id} className="menu-button" onClick={() => onSelectOperation(op.id)}>
-                <span className="menu-icon">{op.icon}</span><span>{op.name}</span>
-              </button>
-            ))}
-          </div>
+    <!-- MAIN MENU -->
+    <div id="main-menu" class="ui-layer pointer-events-auto">
+        <div class="title-container">
+            <h1 class="title-main">FERROVIA</h1>
+            <div class="title-sub">ARMAMENTO SIMULATOR</div>
         </div>
-      );
-    }
+        <button class="menu-btn" onclick="startGame(true)">Nuova Partita</button>
+        <button class="menu-btn" id="btn-continue" onclick="startGame(false)">Continua Carriera</button>
+        <button class="menu-btn" onclick="showScreen('tutorial-screen')">Tutorial Tecnico</button>
+        <button class="menu-btn" onclick="showScreen('credits-screen')">Credits</button>
+    </div>
 
-    function SaldaturaAlluminotermica({ onBack }) {
-      const steps = [
-        { id: 1, name: 'Allineamento', desc: 'Allinea perfettamente i due monconi.', icon: '📏' },
-        { id: 2, name: 'Posa stampo', desc: 'Posiziona lo stampo refrattario.', icon: '🧱' },
-        { id: 3, name: 'Lutatura', desc: 'Sigilla lo stampo con la pasta.', icon: '🧽' },
-        { id: 4, name: 'Preriscaldo', desc: 'Riscalda le rotaie col cannello.', icon: '🔥' },
-        { id: 5, name: 'Colata', desc: 'Innesca la reazione e versa il metallo.', icon: '🌋' },
-        { id: 6, name: 'Sbavatura', desc: 'Rimuovi il materiale in eccesso a caldo.', icon: '⛏️' },
-        { id: 7, name: 'Molatura', desc: 'Rifinisci il profilo della rotaia.', icon: '✨' }
-      ];
-      const [currentStep, setCurrentStep] = useState(0);
-      const isFinished = currentStep === steps.length;
-      return (
-        <div className="game-container">
-          <h2 className="game-title">🔥 Saldatura Alluminotermica</h2>
-          {!isFinished ? (
-            <div className="step-container" style={{ borderColor: '#e74c3c' }}>
-              <div className="step-icon">{steps[currentStep].icon}</div>
-              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
-              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
-              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#e74c3c' }}>Esegui Azione</button>
-              <div className="progress-dots">
-                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#e74c3c' : '#bdc3c7' }} />)}
-              </div>
+    <!-- HUD -->
+    <div id="hud" class="ui-layer hidden">
+        <div class="hud-top">
+            <div class="stats-panel">
+                <div class="stat-row"><span class="stat-label">Salute</span><div class="bar-container"><div class="bar-fill bar-hp" id="bar-hp" style="width: 100%"></div></div></div>
+                <div class="stat-row"><span class="stat-label">Stamina</span><div class="bar-container"><div class="bar-fill bar-sp" id="bar-sp" style="width: 100%"></div></div></div>
+                <div class="stat-row"><span class="stat-label">XP</span><div class="bar-container"><div class="bar-fill bar-xp" id="bar-xp" style="width: 0%"></div></div></div>
             </div>
-          ) : (
-            <div className="finished-container">
-              <div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Saldatura Completata!</h3>
+            <div class="info-panel">
+                <div class="rank-text" id="hud-rank">Grado 1: Manovale</div>
+                <div class="money-text" id="hud-money">€ 0.00</div>
+                <div style="font-size: 0.9rem; margin-top: 5px; color: #bdc3c7;" id="hud-time">08:00 - Sereno</div>
+                <button onclick="showScreen('shop-screen')" style="margin-top:10px; background:var(--primary); border:none; padding:5px 10px; cursor:pointer; font-weight:bold;">Negozio (TAB)</button>
             </div>
-          )}
-          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
         </div>
-      );
-    }
+        
+        <div id="notification-area"></div>
 
-    function SostituzioneTraversine({ onBack }) {
-      const steps = [
-        { id: 1, name: 'Rimozione Attacchi', desc: 'Allenta e rimuovi i sistemi di attacco.', icon: '🔧' },
-        { id: 2, name: 'Sconciamento', desc: 'Rimuovi il pietrisco attorno alla traversina.', icon: '🪨' },
-        { id: 3, name: 'Estrazione', desc: 'Estrai la vecchia traversina da sotto.', icon: '🪵' },
-        { id: 4, name: 'Inserimento', desc: 'Infila la nuova traversina.', icon: '📏' },
-        { id: 5, name: 'Ripristino Attacchi', desc: 'Rimonta e serra i sistemi di attacco.', icon: '🔩' },
-        { id: 6, name: 'Rincalzatura', desc: 'Compatta nuovo pietrisco.', icon: '🚜' }
-      ];
-      const [currentStep, setCurrentStep] = useState(0);
-      const isFinished = currentStep === steps.length;
-      return (
-        <div className="game-container">
-          <h2 className="game-title">🪵 Sostituzione Traversine</h2>
-          {!isFinished ? (
-            <div className="step-container" style={{ borderColor: '#f39c12' }}>
-              <div className="step-icon">{steps[currentStep].icon}</div>
-              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
-              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
-              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#f39c12' }}>Esegui Azione</button>
-              <div className="progress-dots">
-                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#f39c12' : '#bdc3c7' }} />)}
-              </div>
+        <div class="hud-bottom">
+            <div class="mission-panel">
+                <div class="mission-title" id="hud-mission-title">Nessuna Missione Attiva</div>
+                <div class="mission-obj" id="hud-mission-obj">Avvicinati al capocantiere per ricevere ordini.</div>
             </div>
-          ) : (
-            <div className="finished-container"><div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Sostituzione Completata!</h3></div>
-          )}
-          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
-        </div>
-      );
-    }
-
-    function RegolazioneLRS({ onBack }) {
-      const steps = [
-        { id: 1, name: 'Misurazione', desc: 'Rileva la temperatura della rotaia.', icon: '🌡️' },
-        { id: 2, name: 'Svincolo', desc: 'Allenta tutti gli organi di attacco.', icon: '🔧' },
-        { id: 3, name: 'Battitura', desc: 'Batti la rotaia per favorire lo scorrimento.', icon: '🔨' },
-        { id: 4, name: 'Trazionamento', desc: 'Applica i tenditori idraulici.', icon: '⚙️' },
-        { id: 5, name: 'Fissaggio', desc: 'Serra nuovamente gli attacchi in tensione.', icon: '🔩' },
-        { id: 6, name: 'Saldatura', desc: 'Esegui l\'ultima saldatura alluminotermica.', icon: '🔥' }
-      ];
-      const [currentStep, setCurrentStep] = useState(0);
-      const isFinished = currentStep === steps.length;
-      return (
-        <div className="game-container">
-          <h2 className="game-title">📏 Regolazione L.R.S.</h2>
-          {!isFinished ? (
-            <div className="step-container" style={{ borderColor: '#9b59b6' }}>
-              <div className="step-icon">{steps[currentStep].icon}</div>
-              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
-              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
-              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#9b59b6' }}>Esegui Azione</button>
-              <div className="progress-dots">
-                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#9b59b6' : '#bdc3c7' }} />)}
-              </div>
+            <div style="text-align: right; pointer-events: auto;">
+                <div style="background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; margin-bottom: 20px; display: none;" id="interaction-hint">Premi E per interagire</div>
             </div>
-          ) : (
-            <div className="finished-container"><div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Regolazione Completata!</h3></div>
-          )}
-          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
         </div>
-      );
-    }
+    </div>
 
-    function CambioRotaie({ onBack }) {
-      const steps = [
-        { id: 1, name: 'Svincolo', desc: 'Rimuovi tutti gli organi di attacco.', icon: '🔧' },
-        { id: 2, name: 'Piazzamento', desc: 'Posiziona il caricatore strada-rotaia.', icon: '🚜' },
-        { id: 3, name: 'Rimozione', desc: 'Usa la pinza per rimuovere la vecchia rotaia.', icon: '🏗️' },
-        { id: 4, name: 'Posa Nuova', desc: 'Adagia la nuova rotaia sulle selle.', icon: '🛤️' },
-        { id: 5, name: 'Fissaggio', desc: 'Serra nuovamente i sistemi di attacco.', icon: '🔩' }
-      ];
-      const [currentStep, setCurrentStep] = useState(0);
-      const isFinished = currentStep === steps.length;
-      return (
-        <div className="game-container">
-          <h2 className="game-title">🏗️ Cambio Rotaie</h2>
-          {!isFinished ? (
-            <div className="step-container" style={{ borderColor: '#3498db' }}>
-              <div className="step-icon">{steps[currentStep].icon}</div>
-              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
-              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
-              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#3498db' }}>Esegui Azione</button>
-              <div className="progress-dots">
-                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#3498db' : '#bdc3c7' }} />)}
-              </div>
+    <!-- MOBILE CONTROLS -->
+    <div id="mobile-controls">
+        <div id="joystick-knob"></div>
+    </div>
+    <div class="action-btn-mobile" id="btn-action">Azione</div>
+
+    <!-- SHOP / INVENTORY SCREEN -->
+    <div id="shop-screen" class="ui-layer overlay-screen hidden pointer-events-auto">
+        <div class="panel">
+            <h2>Magazzino Cantiere & Carriera</h2>
+            <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                <span>Fondi disponibili: <strong style="color:var(--success)" id="shop-money">€ 0</strong></span>
+                <span>XP Attuali: <strong style="color:var(--primary)" id="shop-xp">0</strong></span>
             </div>
-          ) : (
-            <div className="finished-container"><div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Cambio Completato!</h3></div>
-          )}
-          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
-        </div>
-      );
-    }
-
-    function VaroDeviatoio({ onBack }) {
-      const steps = [
-        { id: 1, name: 'Piano Posa', desc: 'Livella e compatta lo strato di ballast.', icon: '🚜' },
-        { id: 2, name: 'Portali', desc: 'Monta e posiziona i portali idraulici.', icon: '🏗️' },
-        { id: 3, name: 'Sollevamento', desc: 'Solleva il telaio del deviatoio.', icon: '⏫' },
-        { id: 4, name: 'Traslazione', desc: 'Sposta il deviatoio sulla posizione finale.', icon: '➡️' },
-        { id: 5, name: 'Posa', desc: 'Abbassa il deviatoio in posizione.', icon: '⏬' },
-        { id: 6, name: 'Giunzioni', desc: 'Esegui le saldature per collegare il deviatoio.', icon: '📐' }
-      ];
-      const [currentStep, setCurrentStep] = useState(0);
-      const isFinished = currentStep === steps.length;
-      return (
-        <div className="game-container">
-          <h2 className="game-title">🔀 Varo Deviatoio</h2>
-          {!isFinished ? (
-            <div className="step-container" style={{ borderColor: '#e67e22' }}>
-              <div className="step-icon">{steps[currentStep].icon}</div>
-              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
-              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
-              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#e67e22' }}>Esegui Azione</button>
-              <div className="progress-dots">
-                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#e67e22' : '#bdc3c7' }} />)}
-              </div>
+            <div id="shop-items" style="max-height: 300px; overflow-y: auto;">
+                <!-- Populated via JS -->
             </div>
-          ) : (
-            <div className="finished-container"><div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Varo Completato!</h3></div>
-          )}
-          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
-        </div>
-      );
-    }
-
-    function VaroCampate({ onBack }) {
-      const steps = [
-        { id: 1, name: 'Trasporto', desc: 'Sposta il treno cantiere con le campate.', icon: '🚂' },
-        { id: 2, name: 'Aggancio', desc: 'Usa la gru per agganciare in sicurezza i binari.', icon: '🪝' },
-        { id: 3, name: 'Sollevamento', desc: 'Solleva la campata dal vagone.', icon: '🏗️' },
-        { id: 4, name: 'Allineamento', desc: 'Avanza e allinea la nuova campata.', icon: '🎯' },
-        { id: 5, name: 'Posa', desc: 'Abbassa la campata sulla massicciata.', icon: '🛤️' },
-        { id: 6, name: 'Steccatura', desc: 'Applica ganasce e bulloni.', icon: '🔩' }
-      ];
-      const [currentStep, setCurrentStep] = useState(0);
-      const isFinished = currentStep === steps.length;
-      return (
-        <div className="game-container">
-          <h2 className="game-title">🛤️ Varo Campate</h2>
-          {!isFinished ? (
-            <div className="step-container" style={{ borderColor: '#2980b9' }}>
-              <div className="step-icon">{steps[currentStep].icon}</div>
-              <h3>Fase {steps[currentStep].id} di {steps.length}: {steps[currentStep].name}</h3>
-              <p style={{ fontSize: '1.2rem', margin: '1.5rem 0' }}>{steps[currentStep].desc}</p>
-              <button onClick={() => setCurrentStep(currentStep + 1)} className="action-button" style={{ backgroundColor: '#2980b9' }}>Esegui Azione</button>
-              <div className="progress-dots">
-                 {steps.map((_, index) => <div key={index} className="dot" style={{ backgroundColor: index < currentStep ? '#27ae60' : index === currentStep ? '#2980b9' : '#bdc3c7' }} />)}
-              </div>
+            <div style="margin-top:20px; text-align:right;">
+                <button class="menu-btn" style="width:auto; padding:10px 20px;" onclick="closeScreens()">Chiudi</button>
             </div>
-          ) : (
-            <div className="finished-container"><div className="finished-icon">✅</div><h3 style={{ color: '#27ae60' }}>Posa Completata!</h3></div>
-          )}
-          <button onClick={onBack} className="back-button">⬅ Torna al Menu Principale</button>
         </div>
-      );
-    }
+    </div>
 
-    function App() {
-      const [currentOperation, setCurrentOperation] = useState(null);
-      const renderGame = () => {
-        switch (currentOperation) {
-          case 'saldatura': return <SaldaturaAlluminotermica onBack={() => setCurrentOperation(null)} />;
-          case 'sostituzione_traversine': return <SostituzioneTraversine onBack={() => setCurrentOperation(null)} />;
-          case 'lrs': return <RegolazioneLRS onBack={() => setCurrentOperation(null)} />;
-          case 'cambio_rotaie': return <CambioRotaie onBack={() => setCurrentOperation(null)} />;
-          case 'varo_deviatoio': return <VaroDeviatoio onBack={() => setCurrentOperation(null)} />;
-          case 'varo_campate': return <VaroCampate onBack={() => setCurrentOperation(null)} />;
-          default: return <div>Lavorazione non trovata</div>;
+    <!-- TUTORIAL SCREEN -->
+    <div id="tutorial-screen" class="ui-layer overlay-screen hidden pointer-events-auto">
+        <div class="panel">
+            <h2>Manuale Operativo di Base</h2>
+            <div style="line-height: 1.6; max-height: 300px; overflow-y: auto;">
+                <p><strong>Benvenuto nel simulatore RFI Armamento.</strong></p>
+                <p><strong>Comandi:</strong> Usa WASD o Frecce (PC) / Joystick (Mobile) per muoverti. Tasto E o pulsante Azione per interagire con i macchinari, raccogliere materiali e completare task.</p>
+                <p><strong>Carriera:</strong> Completa le missioni per guadagnare XP e Denaro. Salendo di grado sbloccherai l'accesso a macchinari complessi (Rincalzatrici, Caricatori Strada-Rotaia).</p>
+                <p><strong>Sicurezza:</strong> Attenzione ai treni in transito (Allarme rosso) e all'esaurimento della stamina. Riposati fermandoti o comprando caffè al magazzino.</p>
+            </div>
+            <div style="margin-top:20px; text-align:right;">
+                <button class="menu-btn" style="width:auto; padding:10px 20px;" onclick="closeScreens()">Chiudi</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- CREDITS SCREEN -->
+    <div id="credits-screen" class="ui-layer overlay-screen hidden pointer-events-auto">
+        <div class="panel" style="text-align: center;">
+            <h2>Credits</h2>
+            <p>Sviluppato per simulare le dinamiche reali dell'armamento ferroviario.</p>
+            <p>Engine Custom (Vanilla HTML5/JS/Canvas)</p>
+            <div style="margin-top:20px;">
+                <button class="menu-btn" style="width:auto; padding:10px 20px;" onclick="closeScreens()">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+/**
+ * FERROVIA: ARMAMENTO - CORE ENGINE
+ * No external libraries. Completely self-contained.
+ */
+
+// --- 1. CONFIG & CONSTANTS ---
+const CONFIG = {
+    FPS: 60,
+    TILE_SIZE: 40,
+    MAP_WIDTH: 100, // In tiles
+    MAP_HEIGHT: 100,
+    RANKS: [
+        { id: 1, name: 'Manovale Ferroviario', xpReq: 0 },
+        { id: 2, name: 'Operaio Armamento', xpReq: 1000 },
+        { id: 3, name: 'Specialista Rotaie', xpReq: 2500 },
+        { id: 4, name: 'Capo Squadra', xpReq: 5000 },
+        { id: 5, name: 'Direttore di Cantiere', xpReq: 10000 }
+    ],
+    SHOP_ITEMS: [
+        { id: 'coffee', name: 'Caffè (Ripristina Stamina)', type: 'consumable', cost: 5, effect: {stamina: 50} },
+        { id: 'boots', name: 'Scarpe Antinfortunistiche', type: 'equip', cost: 150, desc: 'Velocità +10%', owned: false },
+        { id: 'wrench', name: 'Chiave Dinamometrica Pro', type: 'equip', cost: 300, desc: 'Velocità lavori +20%', owned: false },
+        { id: 'radio', name: 'Radio RFI Avanzata', type: 'equip', cost: 500, desc: 'Allarmi treni anticipati', owned: false }
+    ],
+    MISSIONS: [
+        { id: 'm1', name: 'Sostituzione Traversine', desc: 'Raccogli 5 traversine dal deposito e posale sul binario 1.', objType: 'place_item', targetId: 'traversina', count: 5, reward: 200, xp: 150 },
+        { id: 'm2', name: 'Serraggio Pandrol', desc: 'Serra gli attacchi allentati lungo la linea nord.', objType: 'interact_zone', targetId: 'pandrol_loose', count: 8, reward: 300, xp: 250 },
+        { id: 'm3', name: 'Ispezione Binario', desc: 'Percorri il binario 2 e verifica le geometrie.', objType: 'walk_path', targetId: 'checkpoint', count: 4, reward: 150, xp: 100 }
+    ]
+};
+
+// --- 2. GAME STATE ---
+let STATE = {
+    screen: 'menu', // menu, game
+    lastTime: 0,
+    camera: { x: 0, y: 0 },
+    keys: {},
+    mouse: { x:0, y:0, down:false },
+    joystick: { active: false, dx: 0, dy: 0 },
+    
+    // Player
+    player: {
+        x: 400, y: 400,
+        vx: 0, vy: 0,
+        speed: 200, // px per sec
+        radius: 15,
+        angle: 0,
+        health: 100,
+        stamina: 100,
+        money: 0,
+        xp: 0,
+        inventory: [],
+        equipment: { boots: false, wrench: false, radio: false }
+    },
+    
+    // Environment
+    timeOfDay: 8.0, // 0 to 24
+    weather: 'clear', // clear, rain, fog
+    particles: [],
+    
+    // World Entities
+    trains: [],
+    npcs: [],
+    interactables: [],
+    
+    // Mission
+    activeMission: null,
+    missionProgress: 0
+};
+
+// Canvas Setup
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let cw, ch;
+
+function resize() {
+    cw = window.innerWidth;
+    ch = window.innerHeight;
+    canvas.width = cw;
+    canvas.height = ch;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- 3. AUDIO ENGINE (Web Audio API Synth) ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const SOUNDS = {
+    ui_click: () => playTone(600, 'sine', 0.1),
+    ui_success: () => { playTone(400, 'square', 0.1); setTimeout(()=>playTone(600, 'square', 0.2), 100); },
+    footstep: () => playNoise(0.05, 0.1),
+    metal_clank: () => playTone(300, 'triangle', 0.1, true),
+    train_horn: () => { playTone(250, 'sawtooth', 1.0); playTone(300, 'sawtooth', 1.0); }
+};
+
+function playTone(freq, type, duration, slideDown=false) {
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    if(slideDown) osc.frequency.exponentialRampToValueAtTime(freq*0.5, audioCtx.currentTime + duration);
+    
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+}
+
+function playNoise(duration, vol) {
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    const bufferSize = audioCtx.sampleRate * duration;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    
+    // Add lowpass filter for gravel sound
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 1000;
+    
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    noise.start();
+}
+
+// --- 4. INPUT HANDLING ---
+window.addEventListener('keydown', e => { STATE.keys[e.key.toLowerCase()] = true; if(e.key==='e'||e.key==='E') tryInteract(); if(e.key==='Tab') { e.preventDefault(); showScreen('shop-screen'); } });
+window.addEventListener('keyup', e => { STATE.keys[e.key.toLowerCase()] = false; });
+
+// Mobile Joystick
+const joyBg = document.getElementById('mobile-controls');
+const joyKnob = document.getElementById('joystick-knob');
+let joyCenter = {x:0, y:0};
+
+joyBg.addEventListener('touchstart', e => {
+    STATE.joystick.active = true;
+    const rect = joyBg.getBoundingClientRect();
+    joyCenter = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+    handleJoy(e.touches[0]);
+}, {passive:false});
+
+joyBg.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if(STATE.joystick.active) handleJoy(e.touches[0]);
+}, {passive:false});
+
+joyBg.addEventListener('touchend', e => {
+    STATE.joystick.active = false;
+    STATE.joystick.dx = 0; STATE.joystick.dy = 0;
+    joyKnob.style.transform = `translate(0px, 0px)`;
+});
+
+function handleJoy(touch) {
+    let dx = touch.clientX - joyCenter.x;
+    let dy = touch.clientY - joyCenter.y;
+    const maxDist = 50;
+    const dist = Math.hypot(dx, dy);
+    if(dist > maxDist) {
+        dx = (dx/dist) * maxDist;
+        dy = (dy/dist) * maxDist;
+    }
+    joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+    STATE.joystick.dx = dx / maxDist;
+    STATE.joystick.dy = dy / maxDist;
+}
+
+document.getElementById('btn-action').addEventListener('touchstart', (e)=>{ e.preventDefault(); tryInteract(); });
+
+// --- 5. SAVING & LOADING ---
+function saveGame() {
+    const data = {
+        xp: STATE.player.xp,
+        money: STATE.player.money,
+        equip: STATE.player.equipment,
+        items: CONFIG.SHOP_ITEMS.map(i=>({id:i.id, owned:i.owned}))
+    };
+    localStorage.setItem('ferrovia_save', JSON.stringify(data));
+    notify("Partita salvata", "success");
+}
+
+function loadGame() {
+    const data = localStorage.getItem('ferrovia_save');
+    if(data) {
+        const p = JSON.parse(data);
+        STATE.player.xp = p.xp || 0;
+        STATE.player.money = p.money || 0;
+        STATE.player.equipment = p.equip || STATE.player.equipment;
+        if(p.items) {
+            p.items.forEach(si => {
+                const item = CONFIG.SHOP_ITEMS.find(i=>i.id===si.id);
+                if(item) item.owned = si.owned;
+            });
         }
-      };
-      return <div className="app-container">{currentOperation === null ? <MainMenu onSelectOperation={setCurrentOperation} /> : renderGame()}</div>;
+        updateHUD();
+        return true;
     }
+    return false;
+}
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
+// --- 6. UI MANAGEMENT ---
+function startGame(isNew) {
+    SOUNDS.ui_click();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    if(!isNew) loadGame();
+    
+    document.getElementById('main-menu').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    STATE.screen = 'game';
+    STATE.lastTime = performance.now();
+    
+    initWorld();
+    requestAnimationFrame(gameLoop);
+}
+
+function showScreen(id) {
+    SOUNDS.ui_click();
+    document.querySelectorAll('.overlay-screen').forEach(el => el.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    
+    if(id === 'shop-screen') {
+        document.getElementById('shop-money').innerText = `€ ${STATE.player.money.toFixed(2)}`;
+        document.getElementById('shop-xp').innerText = STATE.player.xp;
+        
+        const container = document.getElementById('shop-items');
+        container.innerHTML = '';
+        CONFIG.SHOP_ITEMS.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'list-item';
+            const canAfford = STATE.player.money >= item.cost;
+            
+            let btnHtml = '';
+            if(item.type === 'equip' && item.owned) {
+                btnHtml = `<button disabled style="background:#7f8c8d">Posseduto</button>`;
+            } else {
+                btnHtml = `<button onclick="buyItem('${item.id}')" ${!canAfford?'disabled style="opacity:0.5"':''}>Acquista (€${item.cost})</button>`;
+            }
+            
+            div.innerHTML = `
+                <div>
+                    <strong>${item.name}</strong><br>
+                    <small style="color:#bdc3c7">${item.desc || ''}</small>
+                </div>
+                ${btnHtml}
+            `;
+            container.appendChild(div);
+        });
+    }
+}
+
+function closeScreens() {
+    SOUNDS.ui_click();
+    document.querySelectorAll('.overlay-screen').forEach(el => el.classList.add('hidden'));
+}
+
+function buyItem(id) {
+    const item = CONFIG.SHOP_ITEMS.find(i=>i.id===id);
+    if(item && STATE.player.money >= item.cost) {
+        STATE.player.money -= item.cost;
+        SOUNDS.ui_success();
+        
+        if(item.type === 'consumable') {
+            if(item.effect.stamina) STATE.player.stamina = Math.min(100, STATE.player.stamina + item.effect.stamina);
+            notify(`Acquistato ${item.name}`, "success");
+        } else if (item.type === 'equip') {
+            item.owned = true;
+            STATE.player.equipment[id] = true;
+            notify(`Equipaggiato ${item.name}`, "success");
+        }
+        
+        showScreen('shop-screen'); // refresh
+        updateHUD();
+        saveGame();
+    }
+}
+
+function notify(text, type="info") {
+    const area = document.getElementById('notification-area');
+    const div = document.createElement('div');
+    div.className = 'notification';
+    div.style.borderColor = type === 'success' ? 'var(--success)' : type === 'danger' ? 'var(--danger)' : 'var(--primary)';
+    div.innerText = text;
+    area.appendChild(div);
+    setTimeout(() => { if(div.parentNode) div.parentNode.removeChild(div); }, 3900);
+}
+
+function getRank() {
+    let currentRank = CONFIG.RANKS[0];
+    for(let r of CONFIG.RANKS) {
+        if(STATE.player.xp >= r.xpReq) currentRank = r;
+    }
+    return currentRank;
+}
+
+function updateHUD() {
+    document.getElementById('bar-hp').style.width = STATE.player.health + '%';
+    document.getElementById('bar-sp').style.width = STATE.player.stamina + '%';
+    
+    const rank = getRank();
+    const nextRank = CONFIG.RANKS.find(r => r.id === rank.id + 1);
+    let xpPercent = 100;
+    if(nextRank) {
+        const xpInLevel = STATE.player.xp - rank.xpReq;
+        const xpNeeded = nextRank.xpReq - rank.xpReq;
+        xpPercent = (xpInLevel / xpNeeded) * 100;
+    }
+    document.getElementById('bar-xp').style.width = xpPercent + '%';
+    
+    document.getElementById('hud-rank').innerText = `Grado ${rank.id}: ${rank.name}`;
+    document.getElementById('hud-money').innerText = `€ ${STATE.player.money.toFixed(2)}`;
+    
+    // Time & Weather
+    const h = Math.floor(STATE.timeOfDay);
+    const m = Math.floor((STATE.timeOfDay % 1) * 60);
+    const timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+    let wStr = STATE.weather === 'clear' ? 'Sereno' : STATE.weather === 'rain' ? 'Pioggia' : 'Nebbia';
+    document.getElementById('hud-time').innerText = `${timeStr} - ${wStr}`;
+    
+    // Mission
+    if(STATE.activeMission) {
+        document.getElementById('hud-mission-title').innerText = STATE.activeMission.name;
+        document.getElementById('hud-mission-obj').innerText = `${STATE.activeMission.desc} (${STATE.missionProgress}/${STATE.activeMission.count})`;
+    } else {
+        document.getElementById('hud-mission-title').innerText = "Turno Libero";
+        document.getElementById('hud-mission-obj').innerText = "Parla col Capocantiere (NPC Giallo) per incarichi.";
+    }
+}
+
+// --- 7. GAME LOGIC & WORLD GENERATION ---
+
+// Simple rect collision
+function intersectRect(r1, r2) {
+  return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y);
+}
+
+function initWorld() {
+    // Generate Rails (horizontal)
+    STATE.rails = [];
+    for(let i=0; i<CONFIG.MAP_WIDTH; i++) {
+        // Track 1
+        STATE.rails.push({ x: i*CONFIG.TILE_SIZE, y: 300, w: CONFIG.TILE_SIZE, h: 60, type: 'track' });
+        // Track 2
+        STATE.rails.push({ x: i*CONFIG.TILE_SIZE, y: 450, w: CONFIG.TILE_SIZE, h: 60, type: 'track' });
+    }
+    
+    // Spawn Capocantiere
+    STATE.npcs.push({ x: 400, y: 200, w: 30, h: 30, color: '#f1c40f', type: 'boss', name: 'Capocantiere' });
+    
+    // Spawn Materials Area
+    STATE.interactables.push({ x: 200, y: 150, w: 80, h: 50, color: '#8e44ad', type: 'materials', desc: 'Deposito Traversine' });
+    
+    // Setup Train Schedule
+    setInterval(spawnTrain, 20000); // Attempt every 20s
+    
+    assignMission(CONFIG.MISSIONS[0]);
+}
+
+function assignMission(m) {
+    STATE.activeMission = JSON.parse(JSON.stringify(m));
+    STATE.missionProgress = 0;
+    SOUNDS.ui_success();
+    notify(`Nuova missione: ${m.name}`);
+    
+    // Spawn mission targets based on type
+    STATE.interactables = STATE.interactables.filter(i => i.type !== 'mission_target');
+    
+    if(m.objType === 'place_item' || m.objType === 'interact_zone') {
+        for(let i=0; i<m.count; i++) {
+            STATE.interactables.push({
+                x: 500 + i*100, y: 310, w: 40, h: 40,
+                color: 'rgba(231, 76, 60, 0.5)',
+                type: 'mission_target',
+                desc: 'Zona Lavoro'
+            });
+        }
+    }
+}
+
+function spawnTrain() {
+    // Random track
+    const yPos = Math.random() > 0.5 ? 300 : 450;
+    const speed = 400; // fast
+    STATE.trains.push({
+        x: -500, y: yPos - 10, w: 400, h: 80, vx: speed
+    });
+    
+    // Warn player
+    if(STATE.player.equipment.radio) {
+        SOUNDS.train_horn();
+        notify("ALLARME RADIO: Treno in transito!", "danger");
+    } else {
+        setTimeout(() => { SOUNDS.train_horn(); notify("Treno in transito!", "danger"); }, 2000);
+    }
+}
+
+function tryInteract() {
+    const pRect = { x: STATE.player.x - STATE.player.radius, y: STATE.player.y - STATE.player.radius, w: STATE.player.radius*2, h: STATE.player.radius*2 };
+    
+    // Check NPCs
+    for(let npc of STATE.npcs) {
+        if(intersectRect(pRect, npc)) {
+            if(npc.type === 'boss') {
+                if(!STATE.activeMission) {
+                    const rndMiss = CONFIG.MISSIONS[Math.floor(Math.random()*CONFIG.MISSIONS.length)];
+                    assignMission(rndMiss);
+                } else {
+                    notify("Finisci prima il lavoro in corso.");
+                }
+            }
+            return;
+        }
+    }
+    
+    // Check Interactables
+    for(let i=STATE.interactables.length-1; i>=0; i--) {
+        let obj = STATE.interactables[i];
+        if(intersectRect(pRect, obj)) {
+            if(obj.type === 'materials') {
+                SOUNDS.metal_clank();
+                notify("Materiali raccolti.");
+                return;
+            }
+            
+            if(obj.type === 'mission_target') {
+                if(STATE.player.stamina < 10) { notify("Sei troppo stanco!", "danger"); return; }
+                
+                // Do work
+                STATE.player.stamina -= 10;
+                SOUNDS.metal_clank();
+                createParticles(obj.x + 20, obj.y + 20, '#f1c40f', 10);
+                
+                // Progress
+                STATE.interactables.splice(i, 1);
+                STATE.missionProgress++;
+                
+                if(STATE.activeMission && STATE.missionProgress >= STATE.activeMission.count) {
+                    // Complete
+                    SOUNDS.ui_success();
+                    notify(`Missione Completata! +${STATE.activeMission.xp}XP, +€${STATE.activeMission.reward}`, "success");
+                    STATE.player.xp += STATE.activeMission.xp;
+                    STATE.player.money += STATE.activeMission.reward;
+                    STATE.activeMission = null;
+                    saveGame();
+                }
+                updateHUD();
+                return;
+            }
+        }
+    }
+}
+
+function createParticles(x, y, color, count) {
+    for(let i=0; i<count; i++) {
+        STATE.particles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 100,
+            vy: (Math.random() - 0.5) * 100,
+            life: 1.0,
+            color: color
+        });
+    }
+}
+
+// --- 8. UPDATE LOOP ---
+function update(dt) {
+    if(STATE.screen !== 'game') return;
+    
+    // Movement
+    let dx = 0, dy = 0;
+    
+    if(STATE.keys['w'] || STATE.keys['arrowup']) dy -= 1;
+    if(STATE.keys['s'] || STATE.keys['arrowdown']) dy += 1;
+    if(STATE.keys['a'] || STATE.keys['arrowleft']) dx -= 1;
+    if(STATE.keys['d'] || STATE.keys['arrowright']) dx += 1;
+    
+    if(STATE.joystick.active) {
+        dx = STATE.joystick.dx;
+        dy = STATE.joystick.dy;
+    }
+    
+    // Normalize diagonal
+    if(dx !== 0 || dy !== 0) {
+        const len = Math.hypot(dx, dy);
+        dx /= len; dy /= len;
+        STATE.player.angle = Math.atan2(dy, dx);
+        
+        if(Math.random() < 0.1) SOUNDS.footstep();
+        
+        // Stamina drain
+        STATE.player.stamina = Math.max(0, STATE.player.stamina - dt * 2);
+    } else {
+        // Stamina recover
+        STATE.player.stamina = Math.min(100, STATE.player.stamina + dt * 5);
+    }
+    
+    let curSpeed = STATE.player.speed;
+    if(STATE.player.equipment.boots) curSpeed *= 1.1;
+    if(STATE.player.stamina < 10) curSpeed *= 0.5; // slow down when tired
+    
+    STATE.player.x += dx * curSpeed * dt;
+    STATE.player.y += dy * curSpeed * dt;
+    
+    // Trains
+    for(let i=STATE.trains.length-1; i>=0; i--) {
+        let t = STATE.trains[i];
+        t.x += t.vx * dt;
+        
+        // Collision with player
+        const pRect = { x: STATE.player.x - STATE.player.radius, y: STATE.player.y - STATE.player.radius, w: STATE.player.radius*2, h: STATE.player.radius*2 };
+        if(intersectRect(pRect, t)) {
+            STATE.player.health -= 50 * dt; // massive damage
+            if(STATE.player.health <= 0) {
+                STATE.player.health = 100;
+                STATE.player.money = Math.max(0, STATE.player.money - 100); // penalty
+                STATE.player.x = 400; STATE.player.y = 100; // respawn
+                notify("INCIDENTE GRAVE! Trasportato in ospedale. Multa sicurazza applicata.", "danger");
+            }
+        }
+        
+        if(t.x > CONFIG.MAP_WIDTH * CONFIG.TILE_SIZE) {
+            STATE.trains.splice(i, 1);
+        }
+    }
+    
+    // Particles
+    for(let i=STATE.particles.length-1; i>=0; i--) {
+        let p = STATE.particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt * 2;
+        if(p.life <= 0) STATE.particles.splice(i, 1);
+    }
+    
+    // Camera follow
+    STATE.camera.x = STATE.player.x - cw/2;
+    STATE.camera.y = STATE.player.y - ch/2;
+    
+    // Environment progression
+    STATE.timeOfDay += dt * 0.1; // 1 real sec = 0.1 game hour (240s = 1 day)
+    if(STATE.timeOfDay >= 24) STATE.timeOfDay = 0;
+    
+    // Interaction Hint
+    const pRect = { x: STATE.player.x - STATE.player.radius, y: STATE.player.y - STATE.player.radius, w: STATE.player.radius*2, h: STATE.player.radius*2 };
+    let nearInteractable = STATE.npcs.some(n=>intersectRect(pRect, n)) || STATE.interactables.some(i=>intersectRect(pRect, i));
+    document.getElementById('interaction-hint').style.display = nearInteractable ? 'block' : 'none';
+    
+    updateHUD();
+}
+
+// --- 9. RENDER LOOP ---
+function drawRect(x, y, w, h, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x - STATE.camera.x, y - STATE.camera.y, w, h);
+}
+
+function drawCircle(x, y, r, color) {
+    ctx.beginPath();
+    ctx.arc(x - STATE.camera.x, y - STATE.camera.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.closePath();
+}
+
+function render() {
+    ctx.clearRect(0, 0, cw, ch);
+    
+    // Ground
+    ctx.fillStyle = '#4a4e69';
+    ctx.fillRect(0,0,cw,ch);
+    
+    // Rails & Ballast
+    if(STATE.rails) {
+        // Draw continuous ballast
+        ctx.fillStyle = '#7f8c8d';
+        ctx.fillRect(-STATE.camera.x, 300 - 10 - STATE.camera.y, CONFIG.MAP_WIDTH*CONFIG.TILE_SIZE, 80);
+        ctx.fillRect(-STATE.camera.x, 450 - 10 - STATE.camera.y, CONFIG.MAP_WIDTH*CONFIG.TILE_SIZE, 80);
+        
+        for(let r of STATE.rails) {
+            // Ties (Traversine)
+            ctx.fillStyle = '#8d6e63';
+            ctx.fillRect(r.x + 10 - STATE.camera.x, r.y - STATE.camera.y, 20, 60);
+            
+            // Rails
+            ctx.fillStyle = '#bdc3c7';
+            ctx.fillRect(r.x - STATE.camera.x, r.y + 10 - STATE.camera.y, CONFIG.TILE_SIZE, 5);
+            ctx.fillRect(r.x - STATE.camera.x, r.y + 45 - STATE.camera.y, CONFIG.TILE_SIZE, 5);
+        }
+    }
+    
+    // Interactables
+    for(let obj of STATE.interactables) {
+        drawRect(obj.x, obj.y, obj.w, obj.h, obj.color);
+        // pulsing border for mission targets
+        if(obj.type === 'mission_target') {
+            ctx.strokeStyle = '#f1c40f';
+            ctx.lineWidth = 2 + Math.sin(performance.now()/200)*2;
+            ctx.strokeRect(obj.x - STATE.camera.x, obj.y - STATE.camera.y, obj.w, obj.h);
+        }
+    }
+    
+    // NPCs
+    for(let npc of STATE.npcs) {
+        drawRect(npc.x, npc.y, npc.w, npc.h, npc.color);
+        ctx.fillStyle = 'white';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(npc.name, npc.x - STATE.camera.x, npc.y - 10 - STATE.camera.y);
+    }
+    
+    // Player
+    ctx.save();
+    ctx.translate(STATE.player.x - STATE.camera.x, STATE.player.y - STATE.camera.y);
+    ctx.rotate(STATE.player.angle);
+    // Body (Hi-vis vest)
+    ctx.fillStyle = '#e67e22';
+    ctx.beginPath(); ctx.arc(0, 0, STATE.player.radius, 0, Math.PI*2); ctx.fill();
+    // Helmet
+    ctx.fillStyle = '#f1c40f';
+    ctx.beginPath(); ctx.arc(0, 0, STATE.player.radius*0.7, 0, Math.PI*2); ctx.fill();
+    // Direction indicator
+    ctx.fillStyle = '#333';
+    ctx.fillRect(STATE.player.radius*0.3, -3, STATE.player.radius, 6);
+    ctx.restore();
+    
+    // Trains
+    for(let t of STATE.trains) {
+        drawRect(t.x, t.y, t.w, t.h, '#c0392b'); // Red train
+        // Windows
+        ctx.fillStyle = '#34495e';
+        for(let i=10; i<t.w-20; i+=40) {
+            ctx.fillRect(t.x + i - STATE.camera.x, t.y + 20 - STATE.camera.y, 20, 40);
+        }
+    }
+    
+    // Particles
+    for(let p of STATE.particles) {
+        ctx.globalAlpha = p.life;
+        drawCircle(p.x, p.y, 3, p.color);
+    }
+    ctx.globalAlpha = 1.0;
+    
+    // Lighting overlay computation
+    updateEnvironmentVisuals();
+}
+
+function updateEnvironmentVisuals() {
+    const overlay = document.getElementById('environment-overlay');
+    const h = STATE.timeOfDay;
+    
+    // Calculate brightness based on time (0 = midnight, 12 = noon)
+    let brightness = 1.0;
+    if(h < 6 || h > 18) {
+        // Night
+        brightness = 0.3;
+    } else if (h >= 6 && h < 8) {
+        // Dawn
+        brightness = 0.3 + 0.7 * ((h-6)/2);
+    } else if (h > 16 && h <= 18) {
+        // Dusk
+        brightness = 1.0 - 0.7 * ((h-16)/2);
+    }
+    
+    // Color tinting
+    let color = `rgba(0,0,0,${1.0 - brightness})`;
+    if (h > 16 && h <= 19) {
+        // Sunset orange tint
+        color = `rgba(230, 100, 0, ${0.4 * (1.0 - brightness)})`;
+    }
+    
+    overlay.style.backgroundColor = color;
+}
+
+// --- 10. MAIN LOOP ---
+function gameLoop(timestamp) {
+    if(!STATE.lastTime) STATE.lastTime = timestamp;
+    const dt = (timestamp - STATE.lastTime) / 1000.0; // delta time in seconds
+    STATE.lastTime = timestamp;
+    
+    // Cap dt to prevent massive jumps on tab switch
+    if(dt < 0.1) {
+        update(dt);
+        render();
+    }
+    
+    if(STATE.screen === 'game') requestAnimationFrame(gameLoop);
+}
+
+// Pre-load initialization
+document.addEventListener("DOMContentLoaded", () => {
+    if(localStorage.getItem('ferrovia_save')) {
+        document.getElementById('btn-continue').style.display = 'inline-block';
+    } else {
+        document.getElementById('btn-continue').style.display = 'none';
+    }
+});
+
+</script>
 </body>
 </html>
