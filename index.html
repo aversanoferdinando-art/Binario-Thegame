@@ -3,885 +3,693 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FERROVIA: ARMAMENTO</title>
+    <title>FERROVIA 3D</title>
     <style>
-        :root {
-            --primary: #f39c12;
-            --bg-dark: #1a1a2e;
-            --text-light: #e0e0e0;
-            --danger: #e74c3c;
-            --success: #2ecc71;
-            --hud-bg: rgba(26, 26, 46, 0.8);
-        }
-        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: var(--bg-dark); color: var(--text-light); overflow: hidden; }
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+        #game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
         
-        #gameCanvas { display: block; width: 100%; height: 100%; }
-        
-        /* UI Layers */
-        .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; }
-        .pointer-events-auto { pointer-events: auto; }
-        .hidden { display: none !important; }
-        
-        /* Main Menu */
-        #main-menu { background: radial-gradient(circle at center, #2c3e50 0%, #1a1a2e 100%); align-items: center; justify-content: center; z-index: 100; }
-        .title-container { text-align: center; margin-bottom: 40px; }
-        .title-main { font-size: 4rem; color: var(--primary); text-transform: uppercase; letter-spacing: 5px; margin: 0; text-shadow: 0 0 10px rgba(243, 156, 18, 0.5); }
-        .title-sub { font-size: 1.5rem; letter-spacing: 2px; color: #95a5a6; margin-top: 10px; }
-        .menu-btn { background: transparent; border: 2px solid var(--primary); color: var(--text-light); padding: 15px 40px; font-size: 1.2rem; text-transform: uppercase; margin: 10px; cursor: pointer; transition: all 0.2s; width: 300px; position: relative; overflow: hidden; }
-        .menu-btn:hover { background: var(--primary); color: #000; box-shadow: 0 0 15px var(--primary); transform: scale(1.05); }
+        /* UI OVERLAYS */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.8); z-index: 100; transition: opacity 0.5s; }
+        .hidden { opacity: 0; pointer-events: none; }
+        .title { color: #f39c12; font-size: 4rem; text-shadow: 0 0 20px #f39c12; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 5px; text-align: center; }
+        .subtitle { color: #bdc3c7; font-size: 1.5rem; letter-spacing: 2px; margin-bottom: 40px; }
+        .btn { background: transparent; color: #fff; border: 2px solid #f39c12; padding: 15px 40px; font-size: 1.2rem; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; transition: 0.3s; margin: 10px; width: 250px; font-weight: bold; }
+        .btn:hover { background: #f39c12; color: #000; box-shadow: 0 0 15px #f39c12; transform: scale(1.05); }
         
         /* HUD */
-        #hud { justify-content: space-between; padding: 20px; z-index: 50; pointer-events: none; }
-        #hud button { pointer-events: auto; }
-        .hud-top { display: flex; justify-content: space-between; }
-        .stats-panel { background: var(--hud-bg); padding: 15px; border-left: 4px solid var(--primary); border-radius: 0 8px 8px 0; backdrop-filter: blur(5px); }
-        .stat-row { display: flex; align-items: center; margin-bottom: 8px; font-weight: bold; }
-        .stat-label { width: 80px; text-transform: uppercase; font-size: 0.8rem; color: #bdc3c7; }
-        .bar-container { width: 150px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; margin-left: 10px; }
-        .bar-fill { height: 100%; transition: width 0.3s ease; }
-        .bar-hp { background: var(--danger); }
-        .bar-sp { background: #3498db; }
-        .bar-xp { background: var(--primary); }
+        #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; box-sizing: border-box; }
+        .hud-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .hud-panel { background: rgba(20, 20, 30, 0.8); border-left: 4px solid #f39c12; padding: 15px; border-radius: 0 8px 8px 0; backdrop-filter: blur(5px); }
+        .hud-right { border-left: none; border-right: 4px solid #f39c12; border-radius: 8px 0 0 8px; text-align: right; }
         
-        .info-panel { background: var(--hud-bg); padding: 15px; border-right: 4px solid var(--primary); border-radius: 8px 0 0 8px; text-align: right; }
-        .rank-text { font-size: 1.2rem; font-weight: bold; color: var(--primary); }
-        .money-text { font-size: 1.1rem; color: var(--success); }
+        .stat-row { display: flex; align-items: center; margin-bottom: 8px; }
+        .stat-label { width: 70px; color: #bdc3c7; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
+        .bar-bg { width: 150px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; }
+        .bar-fill { height: 100%; transition: width 0.2s; }
+        #bar-hp { background: #e74c3c; width: 100%; }
+        #bar-sp { background: #3498db; width: 100%; }
         
-        .hud-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
-        .mission-panel { background: var(--hud-bg); padding: 15px; border-bottom: 4px solid var(--primary); max-width: 400px; border-radius: 8px 8px 0 0; }
-        .mission-title { color: var(--primary); font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
-        .mission-obj { font-size: 0.9rem; }
+        .hud-text { color: #fff; font-weight: bold; font-size: 1.2rem; margin-bottom: 5px; }
+        .money { color: #2ecc71; }
+        .time { color: #f1c40f; }
         
-        /* Controls */
-        #mobile-controls { display: none; position: absolute; bottom: 20px; left: 20px; width: 150px; height: 150px; border-radius: 50%; background: rgba(255,255,255,0.1); pointer-events: auto; touch-action: none; z-index: 60; }
-        #joystick-knob { position: absolute; top: 50px; left: 50px; width: 50px; height: 50px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 10px rgba(0,0,0,0.5); }
-        .action-btn-mobile { display: none; position: absolute; bottom: 40px; right: 40px; width: 70px; height: 70px; border-radius: 50%; background: var(--primary); color: #000; font-weight: bold; text-align: center; line-height: 70px; pointer-events: auto; z-index: 60; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .mission-box { background: rgba(20, 20, 30, 0.9); border-bottom: 4px solid #f39c12; padding: 15px; border-radius: 8px 8px 0 0; max-width: 400px; }
+        .mission-title { color: #f39c12; font-weight: bold; text-transform: uppercase; font-size: 1.1rem; margin-bottom: 5px; }
+        .mission-desc { color: #fff; font-size: 0.9rem; line-height: 1.4; }
         
-        @media (max-width: 768px) {
-            #mobile-controls, .action-btn-mobile { display: block; }
-            .menu-btn { width: 80%; }
-            .bar-container { width: 100px; }
+        /* NOTIFICATIONS */
+        #notify-container { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); text-align: center; }
+        .notification { background: rgba(0,0,0,0.8); color: #fff; padding: 15px 30px; border: 2px solid #f39c12; border-radius: 5px; font-weight: bold; font-size: 1.1rem; opacity: 1; transition: opacity 0.5s; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 0 20px rgba(243, 156, 18, 0.5); }
+        
+        /* INTERACTION HINT */
+        #interact-hint { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); color: #fff; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 1.2rem; border: 2px solid #fff; pointer-events: none; display: none; }
+        
+        /* MOBILE CONTROLS */
+        #mobile-controls { position: absolute; bottom: 0; left: 0; width: 100%; height: 40%; pointer-events: none; z-index: 60; display: none; }
+        .joystick-zone { position: absolute; bottom: 20px; left: 20px; width: 150px; height: 150px; background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); pointer-events: auto; }
+        .joystick-knob { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; background: rgba(243, 156, 18, 0.7); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        
+        .action-btns { position: absolute; bottom: 30px; right: 30px; display: flex; gap: 15px; pointer-events: auto; }
+        .m-btn { width: 70px; height: 70px; border-radius: 50%; background: rgba(20,20,30,0.8); border: 2px solid #f39c12; color: #fff; font-weight: bold; font-size: 0.9rem; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: background 0.1s; text-transform: uppercase; }
+        .m-btn:active { background: #f39c12; color: #000; }
+        
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: rgba(255,255,255,0.5); border-radius: 50%; transform: translate(-50%, -50%); z-index: 40; pointer-events: none; }
+        
+        @media (max-width: 800px) {
+            #mobile-controls { display: block; }
+            .title { font-size: 2.5rem; }
+            .bar-bg { width: 100px; }
         }
-
-        /* Overlay Screens */
-        .overlay-screen { background: rgba(26,26,46,0.95); z-index: 80; align-items: center; justify-content: center; padding: 20px; }
-        .panel { background: #232338; border: 1px solid #3f3f5a; border-radius: 10px; width: 100%; max-width: 600px; padding: 30px; }
-        .panel h2 { color: var(--primary); border-bottom: 2px solid #3f3f5a; padding-bottom: 10px; margin-top: 0; }
-        .list-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #3f3f5a; }
-        .list-item button { background: var(--primary); color: #000; border: none; padding: 5px 15px; cursor: pointer; border-radius: 3px; font-weight: bold; }
-        
-        /* Notifications */
-        #notification-area { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); text-align: center; z-index: 70; }
-        .notification { background: rgba(0,0,0,0.8); border: 1px solid var(--primary); padding: 10px 20px; border-radius: 5px; margin-bottom: 10px; animation: fadeOut 4s forwards; }
-        @keyframes fadeOut { 0% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-20px); } }
-        
-        /* Day/Night Overlay */
-        #environment-overlay { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 10; mix-blend-mode: multiply; transition: background-color 2s; }
     </style>
+    <!-- THREE.JS CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-    <canvas id="gameCanvas"></canvas>
-    <div id="environment-overlay"></div>
+<div id="game-container"></div>
+<div id="crosshair"></div>
 
-    <!-- MAIN MENU -->
-    <div id="main-menu" class="ui-layer pointer-events-auto">
-        <div class="title-container">
-            <h1 class="title-main">FERROVIA</h1>
-            <div class="title-sub">ARMAMENTO SIMULATOR</div>
+<!-- HUD -->
+<div id="hud" class="hidden">
+    <div class="hud-top">
+        <div class="hud-panel">
+            <div class="stat-row"><div class="stat-label">HP</div><div class="bar-bg"><div id="bar-hp" class="bar-fill"></div></div></div>
+            <div class="stat-row"><div class="stat-label">STA</div><div class="bar-bg"><div id="bar-sp" class="bar-fill"></div></div></div>
+            <div style="color:#bdc3c7; font-size:0.8rem; margin-top:5px;">PC: WASD muove, Mouse ruota camera, SHIFT corre, E interagisce.</div>
         </div>
-        <button class="menu-btn" onclick="startGame(true)">Nuova Partita</button>
-        <button class="menu-btn" id="btn-continue" onclick="startGame(false)">Continua Carriera</button>
-        <button class="menu-btn" onclick="showScreen('tutorial-screen')">Tutorial Tecnico</button>
-        <button class="menu-btn" onclick="showScreen('credits-screen')">Credits</button>
-    </div>
-
-    <!-- HUD -->
-    <div id="hud" class="ui-layer hidden">
-        <div class="hud-top">
-            <div class="stats-panel">
-                <div class="stat-row"><span class="stat-label">Salute</span><div class="bar-container"><div class="bar-fill bar-hp" id="bar-hp" style="width: 100%"></div></div></div>
-                <div class="stat-row"><span class="stat-label">Stamina</span><div class="bar-container"><div class="bar-fill bar-sp" id="bar-sp" style="width: 100%"></div></div></div>
-                <div class="stat-row"><span class="stat-label">XP</span><div class="bar-container"><div class="bar-fill bar-xp" id="bar-xp" style="width: 0%"></div></div></div>
-            </div>
-            <div class="info-panel">
-                <div class="rank-text" id="hud-rank">Grado 1: Manovale</div>
-                <div class="money-text" id="hud-money">€ 0.00</div>
-                <div style="font-size: 0.9rem; margin-top: 5px; color: #bdc3c7;" id="hud-time">08:00 - Sereno</div>
-                <button onclick="showScreen('shop-screen')" style="margin-top:10px; background:var(--primary); border:none; padding:5px 10px; cursor:pointer; font-weight:bold;">Negozio (TAB)</button>
-            </div>
-        </div>
-        
-        <div id="notification-area"></div>
-
-        <div class="hud-bottom">
-            <div class="mission-panel">
-                <div class="mission-title" id="hud-mission-title">Nessuna Missione Attiva</div>
-                <div class="mission-obj" id="hud-mission-obj">Avvicinati al capocantiere per ricevere ordini.</div>
-            </div>
-            <div style="text-align: right; pointer-events: auto;">
-                <div style="background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; margin-bottom: 20px; display: none;" id="interaction-hint">Premi E per interagire</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MOBILE CONTROLS -->
-    <div id="mobile-controls">
-        <div id="joystick-knob"></div>
-    </div>
-    <div class="action-btn-mobile" id="btn-action">Azione</div>
-
-    <!-- SHOP / INVENTORY SCREEN -->
-    <div id="shop-screen" class="ui-layer overlay-screen hidden pointer-events-auto">
-        <div class="panel">
-            <h2>Magazzino Cantiere & Carriera</h2>
-            <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
-                <span>Fondi disponibili: <strong style="color:var(--success)" id="shop-money">€ 0</strong></span>
-                <span>XP Attuali: <strong style="color:var(--primary)" id="shop-xp">0</strong></span>
-            </div>
-            <div id="shop-items" style="max-height: 300px; overflow-y: auto;">
-                <!-- Populated via JS -->
-            </div>
-            <div style="margin-top:20px; text-align:right;">
-                <button class="menu-btn" style="width:auto; padding:10px 20px;" onclick="closeScreens()">Chiudi</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- TUTORIAL SCREEN -->
-    <div id="tutorial-screen" class="ui-layer overlay-screen hidden pointer-events-auto">
-        <div class="panel">
-            <h2>Manuale Operativo di Base</h2>
-            <div style="line-height: 1.6; max-height: 300px; overflow-y: auto;">
-                <p><strong>Benvenuto nel simulatore RFI Armamento.</strong></p>
-                <p><strong>Comandi:</strong> Usa WASD o Frecce (PC) / Joystick (Mobile) per muoverti. Tasto E o pulsante Azione per interagire con i macchinari, raccogliere materiali e completare task.</p>
-                <p><strong>Carriera:</strong> Completa le missioni per guadagnare XP e Denaro. Salendo di grado sbloccherai l'accesso a macchinari complessi (Rincalzatrici, Caricatori Strada-Rotaia).</p>
-                <p><strong>Sicurezza:</strong> Attenzione ai treni in transito (Allarme rosso) e all'esaurimento della stamina. Riposati fermandoti o comprando caffè al magazzino.</p>
-            </div>
-            <div style="margin-top:20px; text-align:right;">
-                <button class="menu-btn" style="width:auto; padding:10px 20px;" onclick="closeScreens()">Chiudi</button>
-            </div>
+        <div class="hud-panel hud-right">
+            <div class="hud-text">GRADO: Operaio</div>
+            <div class="hud-text money" id="hud-money">€ 0</div>
+            <div class="hud-text time" id="hud-time">08:00</div>
+            <div class="hud-text" id="hud-timer" style="color: #e74c3c;"></div>
         </div>
     </div>
     
-    <!-- CREDITS SCREEN -->
-    <div id="credits-screen" class="ui-layer overlay-screen hidden pointer-events-auto">
-        <div class="panel" style="text-align: center;">
-            <h2>Credits</h2>
-            <p>Sviluppato per simulare le dinamiche reali dell'armamento ferroviario.</p>
-            <p>Engine Custom (Vanilla HTML5/JS/Canvas)</p>
-            <div style="margin-top:20px;">
-                <button class="menu-btn" style="width:auto; padding:10px 20px;" onclick="closeScreens()">Chiudi</button>
-            </div>
+    <div id="notify-container"></div>
+    
+    <div style="display: flex; justify-content: center; width: 100%;">
+        <div class="mission-box">
+            <div class="mission-title" id="mission-title">Missione</div>
+            <div class="mission-desc" id="mission-desc">Descrizione...</div>
         </div>
     </div>
+</div>
+
+<div id="interact-hint">[E] Interagisci</div>
+
+<!-- MOBILE CONTROLS -->
+<div id="mobile-controls">
+    <div class="joystick-zone" id="joy-zone"><div class="joystick-knob" id="joy-knob"></div></div>
+    <div class="action-btns">
+        <div class="m-btn" id="btn-run">Corsa</div>
+        <div class="m-btn" id="btn-action">Azione</div>
+    </div>
+</div>
+
+<!-- MENUS -->
+<div id="main-menu" class="overlay">
+    <h1 class="title">FERROVIA 3D</h1>
+    <h2 class="subtitle">SIMULATORE ARMAMENTO</h2>
+    <button class="btn" onclick="startGame()">Avvia Turno</button>
+    <button class="btn" onclick="document.getElementById('tut-menu').classList.remove('hidden')">Tutorial</button>
+</div>
+
+<div id="tut-menu" class="overlay hidden" style="z-index: 101; background: rgba(20,20,30,0.95);">
+    <h2 class="title" style="font-size: 2rem;">Manuale Operativo</h2>
+    <div style="max-width: 600px; color: #fff; font-size: 1.1rem; line-height: 1.6; text-align: left; padding: 20px; border: 1px solid #f39c12; border-radius: 8px; background: rgba(0,0,0,0.5);">
+        <p>Sei stato assegnato al cantiere di rinnovamento binari. Il tuo compito è seguire il protocollo di sicurezza e completare i lavori nei tempi previsti.</p>
+        <p><strong style="color:#f39c12">Comandi PC:</strong><br> - W A S D per muoverti<br> - Mouse per guardarti intorno<br> - SHIFT per correre (consuma stamina)<br> - E per interagire con gli oggetti</p>
+        <p><strong style="color:#f39c12">Comandi Smartphone:</strong><br> - Usa il joystick a sinistra per muoverti<br> - Scorri sullo schermo per ruotare la visuale<br> - Usa i tasti a destra per correre e interagire</p>
+    </div>
+    <button class="btn" onclick="document.getElementById('tut-menu').classList.add('hidden')">Chiudi</button>
+</div>
+
+<div id="end-menu" class="overlay hidden" style="z-index: 105;">
+    <h1 class="title" id="end-title" style="color: #2ecc71;">LAVORO COMPLETATO</h1>
+    <h2 class="subtitle" id="end-sub">Ottimo lavoro, linea riaperta in sicurezza.</h2>
+    <h3 style="color: #f1c40f; font-size: 2rem; margin-bottom: 30px;" id="end-score">Punteggio: 1000</h3>
+    <button class="btn" onclick="location.reload()">Torna al Menu</button>
+</div>
 
 <script>
 /**
- * FERROVIA: ARMAMENTO - CORE ENGINE
- * No external libraries. Completely self-contained.
+ * FERROVIA 3D - ENGINE
+ * Vanilla Three.js Third Person Controller & Logic
  */
 
-// --- 1. CONFIG & CONSTANTS ---
-const CONFIG = {
-    FPS: 60,
-    TILE_SIZE: 40,
-    MAP_WIDTH: 100, // In tiles
-    MAP_HEIGHT: 100,
-    RANKS: [
-        { id: 1, name: 'Manovale Ferroviario', xpReq: 0 },
-        { id: 2, name: 'Operaio Armamento', xpReq: 1000 },
-        { id: 3, name: 'Specialista Rotaie', xpReq: 2500 },
-        { id: 4, name: 'Capo Squadra', xpReq: 5000 },
-        { id: 5, name: 'Direttore di Cantiere', xpReq: 10000 }
-    ],
-    SHOP_ITEMS: [
-        { id: 'coffee', name: 'Caffè (Ripristina Stamina)', type: 'consumable', cost: 5, effect: {stamina: 50} },
-        { id: 'boots', name: 'Scarpe Antinfortunistiche', type: 'equip', cost: 150, desc: 'Velocità +10%', owned: false },
-        { id: 'wrench', name: 'Chiave Dinamometrica Pro', type: 'equip', cost: 300, desc: 'Velocità lavori +20%', owned: false },
-        { id: 'radio', name: 'Radio RFI Avanzata', type: 'equip', cost: 500, desc: 'Allarmi treni anticipati', owned: false }
-    ],
-    MISSIONS: [
-        { id: 'm1', name: 'Sostituzione Traversine', desc: 'Raccogli 5 traversine dal deposito e posale sul binario 1.', objType: 'place_item', targetId: 'traversina', count: 5, reward: 200, xp: 150 },
-        { id: 'm2', name: 'Serraggio Pandrol', desc: 'Serra gli attacchi allentati lungo la linea nord.', objType: 'interact_zone', targetId: 'pandrol_loose', count: 8, reward: 300, xp: 250 },
-        { id: 'm3', name: 'Ispezione Binario', desc: 'Percorri il binario 2 e verifica le geometrie.', objType: 'walk_path', targetId: 'checkpoint', count: 4, reward: 150, xp: 100 }
-    ]
-};
-
-// --- 2. GAME STATE ---
-let STATE = {
-    screen: 'menu', // menu, game
-    lastTime: 0,
-    camera: { x: 0, y: 0 },
-    keys: {},
-    mouse: { x:0, y:0, down:false },
-    joystick: { active: false, dx: 0, dy: 0 },
-    
-    // Player
-    player: {
-        x: 400, y: 400,
-        vx: 0, vy: 0,
-        speed: 200, // px per sec
-        radius: 15,
-        angle: 0,
-        health: 100,
-        stamina: 100,
-        money: 0,
-        xp: 0,
-        inventory: [],
-        equipment: { boots: false, wrench: false, radio: false }
+// --- STATE ---
+const STATE = {
+    isRunning: false,
+    money: 0,
+    hp: 100,
+    sp: 100,
+    time: 8, // hours
+    keys: { w:false, a:false, s:false, d:false, shift:false, e:false },
+    joy: { active:false, x:0, y:0 },
+    mouse: { x:0, y:0, isLocked: false, isTouchDrag: false, lastTouchX:0, lastTouchY:0 },
+    cameraAngles: { theta: Math.PI, phi: Math.PI/4 },
+    mission: {
+        active: false,
+        phase: 1,
+        timer: 300, // 5 minutes
+        targetObj: null
     },
-    
-    // Environment
-    timeOfDay: 8.0, // 0 to 24
-    weather: 'clear', // clear, rain, fog
-    particles: [],
-    
-    // World Entities
-    trains: [],
-    npcs: [],
-    interactables: [],
-    
-    // Mission
-    activeMission: null,
-    missionProgress: 0
+    interactable: null
 };
 
-// Canvas Setup
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-let cw, ch;
-
-function resize() {
-    cw = window.innerWidth;
-    ch = window.innerHeight;
-    canvas.width = cw;
-    canvas.height = ch;
-}
-window.addEventListener('resize', resize);
-resize();
-
-// --- 3. AUDIO ENGINE (Web Audio API Synth) ---
+// --- AUDIO (SYNTH) ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const SOUNDS = {
-    ui_click: () => playTone(600, 'sine', 0.1),
-    ui_success: () => { playTone(400, 'square', 0.1); setTimeout(()=>playTone(600, 'square', 0.2), 100); },
-    footstep: () => playNoise(0.05, 0.1),
-    metal_clank: () => playTone(300, 'triangle', 0.1, true),
-    train_horn: () => { playTone(250, 'sawtooth', 1.0); playTone(300, 'sawtooth', 1.0); }
+    step: () => playNoise(0.1, 0.05, 500),
+    clank: () => playTone(300, 'triangle', 0.2, true, 0.3),
+    success: () => { playTone(400, 'square', 0.1); setTimeout(()=>playTone(600, 'square', 0.3), 100); },
+    train: () => { playTone(200, 'sawtooth', 2.0); playTone(250, 'sawtooth', 2.0); playNoise(2.0, 0.2, 200); },
+    ambient_hammer: () => playTone(150, 'square', 0.1, true, 0.1),
+    ambient_spark: () => playNoise(0.2, 0.05, 2000),
+    ambient_engine: () => playTone(60, 'sawtooth', 0.5, false, 0.02)
 };
 
-function playTone(freq, type, duration, slideDown=false) {
+function playTone(freq, type, duration, slide=false, vol=0.1) {
     if(audioCtx.state === 'suspended') audioCtx.resume();
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    if(slideDown) osc.frequency.exponentialRampToValueAtTime(freq*0.5, audioCtx.currentTime + duration);
-    
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-    
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
-}
-
-function playNoise(duration, vol) {
-    if(audioCtx.state === 'suspended') audioCtx.resume();
-    const bufferSize = audioCtx.sampleRate * duration;
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-    
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = buffer;
-    
-    const gain = audioCtx.createGain();
+    if(slide) osc.frequency.exponentialRampToValueAtTime(freq*0.5, audioCtx.currentTime + duration);
     gain.gain.setValueAtTime(vol, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-    
-    // Add lowpass filter for gravel sound
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 1000;
-    
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(audioCtx.destination);
-    noise.start();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + duration);
+}
+function playNoise(duration, vol, filterFreq) {
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    const bs = audioCtx.sampleRate * duration;
+    const b = audioCtx.createBuffer(1, bs, audioCtx.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i=0; i<bs; i++) d[i] = Math.random()*2-1;
+    const n = audioCtx.createBufferSource(); n.buffer = b;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(vol, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    const f = audioCtx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filterFreq;
+    n.connect(f); f.connect(g); g.connect(audioCtx.destination);
+    n.start();
 }
 
-// --- 4. INPUT HANDLING ---
-window.addEventListener('keydown', e => { STATE.keys[e.key.toLowerCase()] = true; if(e.key==='e'||e.key==='E') tryInteract(); if(e.key==='Tab') { e.preventDefault(); showScreen('shop-screen'); } });
-window.addEventListener('keyup', e => { STATE.keys[e.key.toLowerCase()] = false; });
+// --- THREE.JS SETUP ---
+const container = document.getElementById('game-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xfff5b6, 1.0);
+sunLight.position.set(50, 100, 50);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 200;
+sunLight.shadow.camera.left = -50;
+sunLight.shadow.camera.right = 50;
+sunLight.shadow.camera.top = 50;
+sunLight.shadow.camera.bottom = -50;
+scene.add(sunLight);
+
+// Materials
+const matGround = new THREE.MeshLambertMaterial({ color: 0x555555 }); // Ballast base
+const matRail = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8, roughness: 0.3 });
+const matTie = new THREE.MeshLambertMaterial({ color: 0x5c4033 }); // Wood/Concrete
+const matHighlight = new THREE.MeshBasicMaterial({ color: 0xf39c12, wireframe: true });
+const matHiVis = new THREE.MeshLambertMaterial({ color: 0xff6600 }); // Orange vest
+const matSkin = new THREE.MeshLambertMaterial({ color: 0xf1c27d });
+const matPants = new THREE.MeshLambertMaterial({ color: 0x2c3e50 });
+
+// --- WORLD GENERATION ---
+const worldObjects = [];
+const interactables = [];
+let trainObj = null;
+
+// Ground
+const groundGeo = new THREE.PlaneGeometry(200, 200);
+const ground = new THREE.Mesh(groundGeo, matGround);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Procedural Railway Generation
+function buildRailway() {
+    const trackGroup = new THREE.Group();
+    
+    // Left Rail
+    const rail1Geo = new THREE.BoxGeometry(0.15, 0.2, 100);
+    const rail1 = new THREE.Mesh(rail1Geo, matRail);
+    rail1.position.set(-0.75, 0.1, 0);
+    rail1.castShadow = true; rail1.receiveShadow = true;
+    trackGroup.add(rail1);
+    
+    // Right Rail
+    const rail2 = new THREE.Mesh(rail1Geo, matRail);
+    rail2.position.set(0.75, 0.1, 0);
+    rail2.castShadow = true; rail2.receiveShadow = true;
+    trackGroup.add(rail2);
+    
+    // Sleepers (Traversine)
+    const tieGeo = new THREE.BoxGeometry(2.4, 0.15, 0.3);
+    for(let z = -45; z <= 45; z += 0.6) {
+        const tie = new THREE.Mesh(tieGeo, matTie);
+        tie.position.set(0, 0.075, z);
+        tie.castShadow = true; tie.receiveShadow = true;
+        
+        // Target tie for mission (at z = 10)
+        if(Math.abs(z - 10) < 0.1) {
+            tie.userData = { isTarget: true, originalMat: matTie };
+            interactables.push(tie);
+            
+            // Add highlight box
+            const hl = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.3, 0.5), matHighlight);
+            hl.position.copy(tie.position);
+            hl.visible = false;
+            tie.userData.highlight = hl;
+            trackGroup.add(hl);
+        }
+        
+        trackGroup.add(tie);
+    }
+    
+    scene.add(trackGroup);
+}
+buildRailway();
+
+// Scenery props (Lighting towers, signals)
+function buildScenery() {
+    for(let i=0; i<4; i++) {
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 10), new THREE.MeshStandardMaterial({color:0x333333}));
+        pole.position.set(i%2===0?-5:5, 5, -30 + i*20);
+        pole.castShadow = true;
+        
+        const light = new THREE.PointLight(0xffffee, 0.5, 20);
+        light.position.set(0, 5, 0);
+        pole.add(light);
+        
+        // Light fixture
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.2,0.5), new THREE.MeshBasicMaterial({color:0xffffff}));
+        box.position.set(0, 5, 0);
+        pole.add(box);
+        
+        scene.add(pole);
+    }
+}
+buildScenery();
+
+// Train (Animated later)
+function buildTrain() {
+    trainObj = new THREE.Group();
+    const locGeo = new THREE.BoxGeometry(3, 4, 15);
+    const locMat = new THREE.MeshStandardMaterial({color: 0xc0392b});
+    const loc = new THREE.Mesh(locGeo, locMat);
+    loc.position.y = 2;
+    loc.castShadow = true;
+    trainObj.add(loc);
+    
+    trainObj.position.set(5, 0, -100); // Wait on parallel track
+    scene.add(trainObj);
+}
+buildTrain();
+
+// --- PLAYER (Prodedural Model) ---
+const player = new THREE.Group();
+player.position.set(2, 0, 15);
+
+// Torso (Hi-vis)
+const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.4), matHiVis);
+torso.position.y = 1.0;
+torso.castShadow = true;
+player.add(torso);
+
+// Head (Helmet)
+const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshLambertMaterial({color:0xf1c40f})); // Yellow helm
+head.position.y = 1.6;
+head.castShadow = true;
+player.add(head);
+
+// Legs
+const legGeo = new THREE.BoxGeometry(0.25, 0.6, 0.25);
+const legL = new THREE.Mesh(legGeo, matPants);
+legL.position.set(-0.15, 0.3, 0);
+legL.castShadow = true;
+player.add(legL);
+
+const legR = new THREE.Mesh(legGeo, matPants);
+legR.position.set(0.15, 0.3, 0);
+legR.castShadow = true;
+player.add(legR);
+
+scene.add(player);
+
+const pState = { vx:0, vz:0, speed: 4, runSpeed: 7, isMoving: false, stepTimer:0 };
+
+// --- INPUTS ---
+// Keyboard
+window.addEventListener('keydown', e => { 
+    if(!STATE.isRunning) return;
+    const k = e.key.toLowerCase(); STATE.keys[k]=true; 
+    if(k==='shift') STATE.keys.shift=true; 
+    if(k==='e') tryInteract();
+});
+window.addEventListener('keyup', e => { 
+    const k = e.key.toLowerCase(); STATE.keys[k]=false; 
+    if(k==='shift') STATE.keys.shift=false; 
+});
+
+// PC Mouse Camera
+document.body.addEventListener('click', () => {
+    if(STATE.isRunning && !STATE.mouse.isLocked && window.innerWidth > 800) {
+        document.body.requestPointerLock();
+    }
+});
+document.addEventListener('pointerlockchange', () => {
+    STATE.mouse.isLocked = document.pointerLockElement === document.body;
+});
+window.addEventListener('mousemove', e => {
+    if(STATE.mouse.isLocked) {
+        STATE.cameraAngles.theta -= e.movementX * 0.005;
+        STATE.cameraAngles.phi -= e.movementY * 0.005;
+        STATE.cameraAngles.phi = Math.max(0.1, Math.min(Math.PI/2 - 0.1, STATE.cameraAngles.phi));
+    }
+});
 
 // Mobile Joystick
-const joyBg = document.getElementById('mobile-controls');
-const joyKnob = document.getElementById('joystick-knob');
+const joyZone = document.getElementById('joy-zone');
+const joyKnob = document.getElementById('joy-knob');
 let joyCenter = {x:0, y:0};
 
-joyBg.addEventListener('touchstart', e => {
-    STATE.joystick.active = true;
-    const rect = joyBg.getBoundingClientRect();
+joyZone.addEventListener('touchstart', e => {
+    STATE.joy.active = true;
+    const rect = joyZone.getBoundingClientRect();
     joyCenter = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
     handleJoy(e.touches[0]);
 }, {passive:false});
+joyZone.addEventListener('touchmove', e => { e.preventDefault(); if(STATE.joy.active) handleJoy(e.touches[0]); }, {passive:false});
+joyZone.addEventListener('touchend', () => { STATE.joy.active = false; STATE.joy.x=0; STATE.joy.y=0; joyKnob.style.transform = `translate(-50%, -50%)`; });
 
-joyBg.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if(STATE.joystick.active) handleJoy(e.touches[0]);
-}, {passive:false});
-
-joyBg.addEventListener('touchend', e => {
-    STATE.joystick.active = false;
-    STATE.joystick.dx = 0; STATE.joystick.dy = 0;
-    joyKnob.style.transform = `translate(0px, 0px)`;
-});
-
-function handleJoy(touch) {
-    let dx = touch.clientX - joyCenter.x;
-    let dy = touch.clientY - joyCenter.y;
-    const maxDist = 50;
+function handleJoy(t) {
+    let dx = t.clientX - joyCenter.x;
+    let dy = t.clientY - joyCenter.y;
+    const max = 40;
     const dist = Math.hypot(dx, dy);
-    if(dist > maxDist) {
-        dx = (dx/dist) * maxDist;
-        dy = (dy/dist) * maxDist;
-    }
-    joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-    STATE.joystick.dx = dx / maxDist;
-    STATE.joystick.dy = dy / maxDist;
+    if(dist > max) { dx = (dx/dist)*max; dy = (dy/dist)*max; }
+    joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    STATE.joy.x = dx / max;
+    STATE.joy.y = dy / max;
 }
 
+// Mobile Camera Touch
+window.addEventListener('touchstart', e => {
+    if(e.target.closest('#mobile-controls') || !STATE.isRunning) return;
+    STATE.mouse.isTouchDrag = true;
+    STATE.mouse.lastTouchX = e.touches[0].clientX;
+    STATE.mouse.lastTouchY = e.touches[0].clientY;
+}, {passive:false});
+window.addEventListener('touchmove', e => {
+    if(!STATE.mouse.isTouchDrag) return;
+    const dx = e.touches[0].clientX - STATE.mouse.lastTouchX;
+    const dy = e.touches[0].clientY - STATE.mouse.lastTouchY;
+    STATE.cameraAngles.theta -= dx * 0.01;
+    STATE.cameraAngles.phi -= dy * 0.01;
+    STATE.cameraAngles.phi = Math.max(0.1, Math.min(Math.PI/2 - 0.1, STATE.cameraAngles.phi));
+    STATE.mouse.lastTouchX = e.touches[0].clientX;
+    STATE.mouse.lastTouchY = e.touches[0].clientY;
+}, {passive:false});
+window.addEventListener('touchend', () => { STATE.mouse.isTouchDrag = false; });
+
+// Mobile Buttons
+document.getElementById('btn-run').addEventListener('touchstart', (e)=>{ e.preventDefault(); STATE.keys.shift = true; });
+document.getElementById('btn-run').addEventListener('touchend', (e)=>{ e.preventDefault(); STATE.keys.shift = false; });
 document.getElementById('btn-action').addEventListener('touchstart', (e)=>{ e.preventDefault(); tryInteract(); });
 
-// --- 5. SAVING & LOADING ---
-function saveGame() {
-    const data = {
-        xp: STATE.player.xp,
-        money: STATE.player.money,
-        equip: STATE.player.equipment,
-        items: CONFIG.SHOP_ITEMS.map(i=>({id:i.id, owned:i.owned}))
-    };
-    localStorage.setItem('ferrovia_save', JSON.stringify(data));
-    notify("Partita salvata", "success");
-}
+// Resize
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
 
-function loadGame() {
-    const data = localStorage.getItem('ferrovia_save');
-    if(data) {
-        const p = JSON.parse(data);
-        STATE.player.xp = p.xp || 0;
-        STATE.player.money = p.money || 0;
-        STATE.player.equipment = p.equip || STATE.player.equipment;
-        if(p.items) {
-            p.items.forEach(si => {
-                const item = CONFIG.SHOP_ITEMS.find(i=>i.id===si.id);
-                if(item) item.owned = si.owned;
-            });
-        }
-        updateHUD();
-        return true;
-    }
-    return false;
-}
+// --- GAME LOGIC & MISSIONS ---
 
-// --- 6. UI MANAGEMENT ---
-function startGame(isNew) {
-    SOUNDS.ui_click();
-    if(audioCtx.state === 'suspended') audioCtx.resume();
-    if(!isNew) loadGame();
-    
-    document.getElementById('main-menu').classList.add('hidden');
-    document.getElementById('hud').classList.remove('hidden');
-    STATE.screen = 'game';
-    STATE.lastTime = performance.now();
-    
-    initWorld();
-    requestAnimationFrame(gameLoop);
-}
-
-function showScreen(id) {
-    SOUNDS.ui_click();
-    document.querySelectorAll('.overlay-screen').forEach(el => el.classList.add('hidden'));
-    document.getElementById(id).classList.remove('hidden');
-    
-    if(id === 'shop-screen') {
-        document.getElementById('shop-money').innerText = `€ ${STATE.player.money.toFixed(2)}`;
-        document.getElementById('shop-xp').innerText = STATE.player.xp;
-        
-        const container = document.getElementById('shop-items');
-        container.innerHTML = '';
-        CONFIG.SHOP_ITEMS.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'list-item';
-            const canAfford = STATE.player.money >= item.cost;
-            
-            let btnHtml = '';
-            if(item.type === 'equip' && item.owned) {
-                btnHtml = `<button disabled style="background:#7f8c8d">Posseduto</button>`;
-            } else {
-                btnHtml = `<button onclick="buyItem('${item.id}')" ${!canAfford?'disabled style="opacity:0.5"':''}>Acquista (€${item.cost})</button>`;
-            }
-            
-            div.innerHTML = `
-                <div>
-                    <strong>${item.name}</strong><br>
-                    <small style="color:#bdc3c7">${item.desc || ''}</small>
-                </div>
-                ${btnHtml}
-            `;
-            container.appendChild(div);
-        });
-    }
-}
-
-function closeScreens() {
-    SOUNDS.ui_click();
-    document.querySelectorAll('.overlay-screen').forEach(el => el.classList.add('hidden'));
-}
-
-function buyItem(id) {
-    const item = CONFIG.SHOP_ITEMS.find(i=>i.id===id);
-    if(item && STATE.player.money >= item.cost) {
-        STATE.player.money -= item.cost;
-        SOUNDS.ui_success();
-        
-        if(item.type === 'consumable') {
-            if(item.effect.stamina) STATE.player.stamina = Math.min(100, STATE.player.stamina + item.effect.stamina);
-            notify(`Acquistato ${item.name}`, "success");
-        } else if (item.type === 'equip') {
-            item.owned = true;
-            STATE.player.equipment[id] = true;
-            notify(`Equipaggiato ${item.name}`, "success");
-        }
-        
-        showScreen('shop-screen'); // refresh
-        updateHUD();
-        saveGame();
-    }
-}
-
-function notify(text, type="info") {
-    const area = document.getElementById('notification-area');
-    const div = document.createElement('div');
-    div.className = 'notification';
-    div.style.borderColor = type === 'success' ? 'var(--success)' : type === 'danger' ? 'var(--danger)' : 'var(--primary)';
-    div.innerText = text;
-    area.appendChild(div);
-    setTimeout(() => { if(div.parentNode) div.parentNode.removeChild(div); }, 3900);
-}
-
-function getRank() {
-    let currentRank = CONFIG.RANKS[0];
-    for(let r of CONFIG.RANKS) {
-        if(STATE.player.xp >= r.xpReq) currentRank = r;
-    }
-    return currentRank;
+function notify(text) {
+    const c = document.getElementById('notify-container');
+    const n = document.createElement('div');
+    n.className = 'notification';
+    n.innerText = text;
+    c.appendChild(n);
+    setTimeout(()=> { n.style.opacity = '0'; setTimeout(()=>n.remove(), 500); }, 3000);
 }
 
 function updateHUD() {
-    document.getElementById('bar-hp').style.width = STATE.player.health + '%';
-    document.getElementById('bar-sp').style.width = STATE.player.stamina + '%';
+    document.getElementById('bar-hp').style.width = `${STATE.hp}%`;
+    document.getElementById('bar-sp').style.width = `${STATE.sp}%`;
+    document.getElementById('hud-money').innerText = `€ ${STATE.money}`;
     
-    const rank = getRank();
-    const nextRank = CONFIG.RANKS.find(r => r.id === rank.id + 1);
-    let xpPercent = 100;
-    if(nextRank) {
-        const xpInLevel = STATE.player.xp - rank.xpReq;
-        const xpNeeded = nextRank.xpReq - rank.xpReq;
-        xpPercent = (xpInLevel / xpNeeded) * 100;
-    }
-    document.getElementById('bar-xp').style.width = xpPercent + '%';
+    // Time
+    const h = Math.floor(STATE.time);
+    const m = Math.floor((STATE.time % 1) * 60);
+    document.getElementById('hud-time').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
     
-    document.getElementById('hud-rank').innerText = `Grado ${rank.id}: ${rank.name}`;
-    document.getElementById('hud-money').innerText = `€ ${STATE.player.money.toFixed(2)}`;
+    // Timer
+    const tMin = Math.floor(STATE.mission.timer / 60);
+    const tSec = Math.floor(STATE.mission.timer % 60);
+    document.getElementById('hud-timer').innerText = `TIMER: ${tMin.toString().padStart(2,'0')}:${tSec.toString().padStart(2,'0')}`;
     
-    // Time & Weather
-    const h = Math.floor(STATE.timeOfDay);
-    const m = Math.floor((STATE.timeOfDay % 1) * 60);
-    const timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
-    let wStr = STATE.weather === 'clear' ? 'Sereno' : STATE.weather === 'rain' ? 'Pioggia' : 'Nebbia';
-    document.getElementById('hud-time').innerText = `${timeStr} - ${wStr}`;
-    
-    // Mission
-    if(STATE.activeMission) {
-        document.getElementById('hud-mission-title').innerText = STATE.activeMission.name;
-        document.getElementById('hud-mission-obj').innerText = `${STATE.activeMission.desc} (${STATE.missionProgress}/${STATE.activeMission.count})`;
-    } else {
-        document.getElementById('hud-mission-title').innerText = "Turno Libero";
-        document.getElementById('hud-mission-obj').innerText = "Parla col Capocantiere (NPC Giallo) per incarichi.";
-    }
+    // Mission Text
+    const texts = [
+        "",
+        "Trova la traversina danneggiata evidenziata.",
+        "Usa l'avvitatore per rimuovere gli attacchi (Pandrol).",
+        "Estrai la vecchia traversina.",
+        "Inserisci la nuova traversina in C.A.P.",
+        "Serra i nuovi attacchi alla rotaia.",
+        "Controlla lo scartamento e il livello."
+    ];
+    document.getElementById('mission-title').innerText = `SOSTITUZIONE TRAVERSINA - FASE ${STATE.mission.phase}/6`;
+    document.getElementById('mission-desc').innerText = texts[STATE.mission.phase] || "Lavoro completato.";
 }
 
-// --- 7. GAME LOGIC & WORLD GENERATION ---
-
-// Simple rect collision
-function intersectRect(r1, r2) {
-  return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y);
-}
-
-function initWorld() {
-    // Generate Rails (horizontal)
-    STATE.rails = [];
-    for(let i=0; i<CONFIG.MAP_WIDTH; i++) {
-        // Track 1
-        STATE.rails.push({ x: i*CONFIG.TILE_SIZE, y: 300, w: CONFIG.TILE_SIZE, h: 60, type: 'track' });
-        // Track 2
-        STATE.rails.push({ x: i*CONFIG.TILE_SIZE, y: 450, w: CONFIG.TILE_SIZE, h: 60, type: 'track' });
-    }
-    
-    // Spawn Capocantiere
-    STATE.npcs.push({ x: 400, y: 200, w: 30, h: 30, color: '#f1c40f', type: 'boss', name: 'Capocantiere' });
-    
-    // Spawn Materials Area
-    STATE.interactables.push({ x: 200, y: 150, w: 80, h: 50, color: '#8e44ad', type: 'materials', desc: 'Deposito Traversine' });
-    
-    // Setup Train Schedule
-    setInterval(spawnTrain, 20000); // Attempt every 20s
-    
-    assignMission(CONFIG.MISSIONS[0]);
-}
-
-function assignMission(m) {
-    STATE.activeMission = JSON.parse(JSON.stringify(m));
-    STATE.missionProgress = 0;
-    SOUNDS.ui_success();
-    notify(`Nuova missione: ${m.name}`);
-    
-    // Spawn mission targets based on type
-    STATE.interactables = STATE.interactables.filter(i => i.type !== 'mission_target');
-    
-    if(m.objType === 'place_item' || m.objType === 'interact_zone') {
-        for(let i=0; i<m.count; i++) {
-            STATE.interactables.push({
-                x: 500 + i*100, y: 310, w: 40, h: 40,
-                color: 'rgba(231, 76, 60, 0.5)',
-                type: 'mission_target',
-                desc: 'Zona Lavoro'
-            });
-        }
-    }
-}
-
-function spawnTrain() {
-    // Random track
-    const yPos = Math.random() > 0.5 ? 300 : 450;
-    const speed = 400; // fast
-    STATE.trains.push({
-        x: -500, y: yPos - 10, w: 400, h: 80, vx: speed
-    });
-    
-    // Warn player
-    if(STATE.player.equipment.radio) {
-        SOUNDS.train_horn();
-        notify("ALLARME RADIO: Treno in transito!", "danger");
-    } else {
-        setTimeout(() => { SOUNDS.train_horn(); notify("Treno in transito!", "danger"); }, 2000);
-    }
+function setMissionTarget(obj) {
+    if(STATE.mission.targetObj) STATE.mission.targetObj.userData.highlight.visible = false;
+    STATE.mission.targetObj = obj;
+    if(obj) obj.userData.highlight.visible = true;
 }
 
 function tryInteract() {
-    const pRect = { x: STATE.player.x - STATE.player.radius, y: STATE.player.y - STATE.player.radius, w: STATE.player.radius*2, h: STATE.player.radius*2 };
+    if(!STATE.interactable || !STATE.mission.active) return;
     
-    // Check NPCs
-    for(let npc of STATE.npcs) {
-        if(intersectRect(pRect, npc)) {
-            if(npc.type === 'boss') {
-                if(!STATE.activeMission) {
-                    const rndMiss = CONFIG.MISSIONS[Math.floor(Math.random()*CONFIG.MISSIONS.length)];
-                    assignMission(rndMiss);
-                } else {
-                    notify("Finisci prima il lavoro in corso.");
-                }
-            }
+    const obj = STATE.interactable;
+    if(obj === STATE.mission.targetObj) {
+        if(STATE.sp < 15) { notify("Sei troppo stanco!"); return; }
+        
+        STATE.sp -= 15;
+        SOUNDS.clank();
+        
+        STATE.mission.phase++;
+        
+        // Visual updates based on phase
+        if(STATE.mission.phase === 3) {
+            obj.material = new THREE.MeshLambertMaterial({color: 0x333333}); // loosen
+            notify("Attacchi rimossi.");
+        } else if (STATE.mission.phase === 4) {
+            obj.visible = false; // removed
+            notify("Vecchia traversina estratta.");
+        } else if (STATE.mission.phase === 5) {
+            obj.visible = true;
+            obj.material = new THREE.MeshLambertMaterial({color: 0xaaaaaa}); // New concrete tie
+            notify("Nuova traversina inserita.");
+        } else if (STATE.mission.phase === 6) {
+            obj.material = new THREE.MeshLambertMaterial({color: 0x888888}); // fastened
+            notify("Attacchi serrati.");
+        } else if (STATE.mission.phase > 6) {
+            obj.userData.highlight.visible = false;
+            STATE.mission.targetObj = null;
+            missionComplete();
             return;
         }
-    }
-    
-    // Check Interactables
-    for(let i=STATE.interactables.length-1; i>=0; i--) {
-        let obj = STATE.interactables[i];
-        if(intersectRect(pRect, obj)) {
-            if(obj.type === 'materials') {
-                SOUNDS.metal_clank();
-                notify("Materiali raccolti.");
-                return;
-            }
-            
-            if(obj.type === 'mission_target') {
-                if(STATE.player.stamina < 10) { notify("Sei troppo stanco!", "danger"); return; }
-                
-                // Do work
-                STATE.player.stamina -= 10;
-                SOUNDS.metal_clank();
-                createParticles(obj.x + 20, obj.y + 20, '#f1c40f', 10);
-                
-                // Progress
-                STATE.interactables.splice(i, 1);
-                STATE.missionProgress++;
-                
-                if(STATE.activeMission && STATE.missionProgress >= STATE.activeMission.count) {
-                    // Complete
-                    SOUNDS.ui_success();
-                    notify(`Missione Completata! +${STATE.activeMission.xp}XP, +€${STATE.activeMission.reward}`, "success");
-                    STATE.player.xp += STATE.activeMission.xp;
-                    STATE.player.money += STATE.activeMission.reward;
-                    STATE.activeMission = null;
-                    saveGame();
-                }
-                updateHUD();
-                return;
-            }
-        }
+        
+        updateHUD();
     }
 }
 
-function createParticles(x, y, color, count) {
-    for(let i=0; i<count; i++) {
-        STATE.particles.push({
-            x: x, y: y,
-            vx: (Math.random() - 0.5) * 100,
-            vy: (Math.random() - 0.5) * 100,
-            life: 1.0,
-            color: color
-        });
-    }
+function missionComplete() {
+    STATE.mission.active = false;
+    SOUNDS.success();
+    const score = Math.floor(STATE.mission.timer * 10) + (STATE.hp * 5);
+    
+    document.getElementById('hud').classList.add('hidden');
+    document.getElementById('end-menu').classList.remove('hidden');
+    document.getElementById('end-score').innerText = `Punteggio: ${score}`;
+    document.getElementById('mobile-controls').style.display = 'none';
+    if(document.pointerLockElement) document.exitPointerLock();
 }
 
-// --- 8. UPDATE LOOP ---
-function update(dt) {
-    if(STATE.screen !== 'game') return;
+function startGame() {
+    SOUNDS.success();
+    document.getElementById('main-menu').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    STATE.isRunning = true;
+    STATE.mission.active = true;
     
-    // Movement
-    let dx = 0, dy = 0;
-    
-    if(STATE.keys['w'] || STATE.keys['arrowup']) dy -= 1;
-    if(STATE.keys['s'] || STATE.keys['arrowdown']) dy += 1;
-    if(STATE.keys['a'] || STATE.keys['arrowleft']) dx -= 1;
-    if(STATE.keys['d'] || STATE.keys['arrowright']) dx += 1;
-    
-    if(STATE.joystick.active) {
-        dx = STATE.joystick.dx;
-        dy = STATE.joystick.dy;
-    }
-    
-    // Normalize diagonal
-    if(dx !== 0 || dy !== 0) {
-        const len = Math.hypot(dx, dy);
-        dx /= len; dy /= len;
-        STATE.player.angle = Math.atan2(dy, dx);
-        
-        if(Math.random() < 0.1) SOUNDS.footstep();
-        
-        // Stamina drain
-        STATE.player.stamina = Math.max(0, STATE.player.stamina - dt * 2);
-    } else {
-        // Stamina recover
-        STATE.player.stamina = Math.min(100, STATE.player.stamina + dt * 5);
-    }
-    
-    let curSpeed = STATE.player.speed;
-    if(STATE.player.equipment.boots) curSpeed *= 1.1;
-    if(STATE.player.stamina < 10) curSpeed *= 0.5; // slow down when tired
-    
-    STATE.player.x += dx * curSpeed * dt;
-    STATE.player.y += dy * curSpeed * dt;
-    
-    // Trains
-    for(let i=STATE.trains.length-1; i>=0; i--) {
-        let t = STATE.trains[i];
-        t.x += t.vx * dt;
-        
-        // Collision with player
-        const pRect = { x: STATE.player.x - STATE.player.radius, y: STATE.player.y - STATE.player.radius, w: STATE.player.radius*2, h: STATE.player.radius*2 };
-        if(intersectRect(pRect, t)) {
-            STATE.player.health -= 50 * dt; // massive damage
-            if(STATE.player.health <= 0) {
-                STATE.player.health = 100;
-                STATE.player.money = Math.max(0, STATE.player.money - 100); // penalty
-                STATE.player.x = 400; STATE.player.y = 100; // respawn
-                notify("INCIDENTE GRAVE! Trasportato in ospedale. Multa sicurazza applicata.", "danger");
-            }
-        }
-        
-        if(t.x > CONFIG.MAP_WIDTH * CONFIG.TILE_SIZE) {
-            STATE.trains.splice(i, 1);
-        }
-    }
-    
-    // Particles
-    for(let i=STATE.particles.length-1; i>=0; i--) {
-        let p = STATE.particles[i];
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.life -= dt * 2;
-        if(p.life <= 0) STATE.particles.splice(i, 1);
-    }
-    
-    // Camera follow
-    STATE.camera.x = STATE.player.x - cw/2;
-    STATE.camera.y = STATE.player.y - ch/2;
-    
-    // Environment progression
-    STATE.timeOfDay += dt * 0.1; // 1 real sec = 0.1 game hour (240s = 1 day)
-    if(STATE.timeOfDay >= 24) STATE.timeOfDay = 0;
-    
-    // Interaction Hint
-    const pRect = { x: STATE.player.x - STATE.player.radius, y: STATE.player.y - STATE.player.radius, w: STATE.player.radius*2, h: STATE.player.radius*2 };
-    let nearInteractable = STATE.npcs.some(n=>intersectRect(pRect, n)) || STATE.interactables.some(i=>intersectRect(pRect, i));
-    document.getElementById('interaction-hint').style.display = nearInteractable ? 'block' : 'none';
-    
+    // Find target tie
+    const targetTie = interactables.find(i => i.userData.isTarget);
+    setMissionTarget(targetTie);
     updateHUD();
 }
 
-// --- 9. RENDER LOOP ---
-function drawRect(x, y, w, h, color) {
-    ctx.fillStyle = color;
-    ctx.fillRect(x - STATE.camera.x, y - STATE.camera.y, w, h);
-}
+// --- MAIN LOOP ---
+const clock = new THREE.Clock();
 
-function drawCircle(x, y, r, color) {
-    ctx.beginPath();
-    ctx.arc(x - STATE.camera.x, y - STATE.camera.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.closePath();
-}
-
-function render() {
-    ctx.clearRect(0, 0, cw, ch);
+function animate() {
+    requestAnimationFrame(animate);
     
-    // Ground
-    ctx.fillStyle = '#4a4e69';
-    ctx.fillRect(0,0,cw,ch);
+    const dt = Math.min(clock.getDelta(), 0.1);
     
-    // Rails & Ballast
-    if(STATE.rails) {
-        // Draw continuous ballast
-        ctx.fillStyle = '#7f8c8d';
-        ctx.fillRect(-STATE.camera.x, 300 - 10 - STATE.camera.y, CONFIG.MAP_WIDTH*CONFIG.TILE_SIZE, 80);
-        ctx.fillRect(-STATE.camera.x, 450 - 10 - STATE.camera.y, CONFIG.MAP_WIDTH*CONFIG.TILE_SIZE, 80);
+    if(STATE.isRunning) {
+        // Timers
+        STATE.time += dt * 0.05; // Day cycle
+        if(STATE.mission.active) {
+            STATE.mission.timer -= dt;
+            if(STATE.mission.timer <= 0) {
+                STATE.mission.timer = 0;
+                STATE.mission.active = false;
+                document.getElementById('end-title').innerText = "TEMPO SCADUTO";
+                document.getElementById('end-title').style.color = "#e74c3c";
+                document.getElementById('end-sub').innerText = "Il treno regionale sta arrivando. Cantiere fallito.";
+                missionComplete();
+            }
+        }
         
-        for(let r of STATE.rails) {
-            // Ties (Traversine)
-            ctx.fillStyle = '#8d6e63';
-            ctx.fillRect(r.x + 10 - STATE.camera.x, r.y - STATE.camera.y, 20, 60);
+        // Stamina logic
+        if(!STATE.keys.shift && (STATE.keys.w||STATE.keys.a||STATE.keys.s||STATE.keys.d || STATE.joy.active)) {
+            STATE.sp = Math.max(0, STATE.sp - dt * 2);
+        } else if (!STATE.keys.shift && !STATE.joy.active) {
+            STATE.sp = Math.min(100, STATE.sp + dt * 10);
+        }
+        
+        // Movement Input
+        let fwd = 0, right = 0;
+        if(STATE.keys.w) fwd = 1;
+        if(STATE.keys.s) fwd = -1;
+        if(STATE.keys.a) right = -1;
+        if(STATE.keys.d) right = 1;
+        
+        if(STATE.joy.active) {
+            fwd = -STATE.joy.y;
+            right = STATE.joy.x;
+        }
+        
+        pState.isMoving = (fwd !== 0 || right !== 0);
+        let speed = STATE.keys.shift && STATE.sp > 5 ? pState.runSpeed : pState.speed;
+        if(STATE.keys.shift && STATE.sp > 5 && pState.isMoving) STATE.sp -= dt * 15;
+        if(STATE.sp < 5) speed = pState.speed * 0.5; // tired
+        
+        // Calculate movement relative to camera
+        if(pState.isMoving) {
+            const camDir = new THREE.Vector3();
+            camera.getWorldDirection(camDir);
+            camDir.y = 0; camDir.normalize();
             
-            // Rails
-            ctx.fillStyle = '#bdc3c7';
-            ctx.fillRect(r.x - STATE.camera.x, r.y + 10 - STATE.camera.y, CONFIG.TILE_SIZE, 5);
-            ctx.fillRect(r.x - STATE.camera.x, r.y + 45 - STATE.camera.y, CONFIG.TILE_SIZE, 5);
+            const camRight = new THREE.Vector3().crossVectors(camDir, new THREE.Vector3(0,1,0)).normalize();
+            
+            const moveVec = new THREE.Vector3();
+            moveVec.addScaledVector(camDir, fwd);
+            moveVec.addScaledVector(camRight, right);
+            moveVec.normalize();
+            
+            player.position.addScaledVector(moveVec, speed * dt);
+            
+            // Rotate player to face movement
+            const targetAngle = Math.atan2(-moveVec.x, -moveVec.z);
+            // simple lerp angle
+            player.rotation.y += (targetAngle - player.rotation.y) * 10 * dt;
+            
+            // Bobbing animation
+            pState.stepTimer += dt * (speed * 1.5);
+            player.position.y = Math.abs(Math.sin(pState.stepTimer)) * 0.1;
+            legL.rotation.x = Math.sin(pState.stepTimer) * 0.5;
+            legR.rotation.x = -Math.sin(pState.stepTimer) * 0.5;
+            
+            if(Math.sin(pState.stepTimer) > 0.9 && Math.sin(pState.stepTimer - dt*(speed*1.5)) <= 0.9) SOUNDS.step();
+            
+        } else {
+            player.position.y = 0;
+            legL.rotation.x = 0; legR.rotation.x = 0;
+            pState.stepTimer = 0;
         }
-    }
-    
-    // Interactables
-    for(let obj of STATE.interactables) {
-        drawRect(obj.x, obj.y, obj.w, obj.h, obj.color);
-        // pulsing border for mission targets
-        if(obj.type === 'mission_target') {
-            ctx.strokeStyle = '#f1c40f';
-            ctx.lineWidth = 2 + Math.sin(performance.now()/200)*2;
-            ctx.strokeRect(obj.x - STATE.camera.x, obj.y - STATE.camera.y, obj.w, obj.h);
+        
+        // Camera Follow (Orbit)
+        const radius = 5;
+        const camX = player.position.x + radius * Math.sin(STATE.cameraAngles.theta) * Math.cos(STATE.cameraAngles.phi);
+        const camY = player.position.y + 1.5 + radius * Math.sin(STATE.cameraAngles.phi);
+        const camZ = player.position.z + radius * Math.cos(STATE.cameraAngles.theta) * Math.cos(STATE.cameraAngles.phi);
+        
+        camera.position.set(camX, camY, camZ);
+        camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
+        
+        // Interaction Check
+        STATE.interactable = null;
+        let minDist = 2.0;
+        for(let obj of interactables) {
+            const dist = player.position.distanceTo(obj.position);
+            if(dist < minDist) {
+                STATE.interactable = obj;
+                minDist = dist;
+            }
         }
-    }
-    
-    // NPCs
-    for(let npc of STATE.npcs) {
-        drawRect(npc.x, npc.y, npc.w, npc.h, npc.color);
-        ctx.fillStyle = 'white';
-        ctx.font = '12px sans-serif';
-        ctx.fillText(npc.name, npc.x - STATE.camera.x, npc.y - 10 - STATE.camera.y);
-    }
-    
-    // Player
-    ctx.save();
-    ctx.translate(STATE.player.x - STATE.camera.x, STATE.player.y - STATE.camera.y);
-    ctx.rotate(STATE.player.angle);
-    // Body (Hi-vis vest)
-    ctx.fillStyle = '#e67e22';
-    ctx.beginPath(); ctx.arc(0, 0, STATE.player.radius, 0, Math.PI*2); ctx.fill();
-    // Helmet
-    ctx.fillStyle = '#f1c40f';
-    ctx.beginPath(); ctx.arc(0, 0, STATE.player.radius*0.7, 0, Math.PI*2); ctx.fill();
-    // Direction indicator
-    ctx.fillStyle = '#333';
-    ctx.fillRect(STATE.player.radius*0.3, -3, STATE.player.radius, 6);
-    ctx.restore();
-    
-    // Trains
-    for(let t of STATE.trains) {
-        drawRect(t.x, t.y, t.w, t.h, '#c0392b'); // Red train
-        // Windows
-        ctx.fillStyle = '#34495e';
-        for(let i=10; i<t.w-20; i+=40) {
-            ctx.fillRect(t.x + i - STATE.camera.x, t.y + 20 - STATE.camera.y, 20, 40);
+        document.getElementById('interact-hint').style.display = STATE.interactable ? 'block' : 'none';
+        
+        // Train movement
+        trainObj.position.z += 20 * dt;
+        if(trainObj.position.z > 100) {
+            trainObj.position.z = -150;
+            if(Math.random() < 0.3) SOUNDS.train();
         }
+        
+        // Environment update
+        const timeFactor = Math.sin((STATE.time - 6) * Math.PI / 12); // peak at 12
+        sunLight.intensity = Math.max(0.1, timeFactor);
+        const colorFactor = Math.max(0.1, timeFactor);
+        scene.background = new THREE.Color(0x87CEEB).multiplyScalar(colorFactor);
+        scene.fog.color.copy(scene.background);
+        
+        updateHUD();
     }
     
-    // Particles
-    for(let p of STATE.particles) {
-        ctx.globalAlpha = p.life;
-        drawCircle(p.x, p.y, 3, p.color);
-    }
-    ctx.globalAlpha = 1.0;
-    
-    // Lighting overlay computation
-    updateEnvironmentVisuals();
+    renderer.render(scene, camera);
 }
 
-function updateEnvironmentVisuals() {
-    const overlay = document.getElementById('environment-overlay');
-    const h = STATE.timeOfDay;
-    
-    // Calculate brightness based on time (0 = midnight, 12 = noon)
-    let brightness = 1.0;
-    if(h < 6 || h > 18) {
-        // Night
-        brightness = 0.3;
-    } else if (h >= 6 && h < 8) {
-        // Dawn
-        brightness = 0.3 + 0.7 * ((h-6)/2);
-    } else if (h > 16 && h <= 18) {
-        // Dusk
-        brightness = 1.0 - 0.7 * ((h-16)/2);
-    }
-    
-    // Color tinting
-    let color = `rgba(0,0,0,${1.0 - brightness})`;
-    if (h > 16 && h <= 19) {
-        // Sunset orange tint
-        color = `rgba(230, 100, 0, ${0.4 * (1.0 - brightness)})`;
-    }
-    
-    overlay.style.backgroundColor = color;
-}
-
-// --- 10. MAIN LOOP ---
-function gameLoop(timestamp) {
-    if(!STATE.lastTime) STATE.lastTime = timestamp;
-    const dt = (timestamp - STATE.lastTime) / 1000.0; // delta time in seconds
-    STATE.lastTime = timestamp;
-    
-    // Cap dt to prevent massive jumps on tab switch
-    if(dt < 0.1) {
-        update(dt);
-        render();
-    }
-    
-    if(STATE.screen === 'game') requestAnimationFrame(gameLoop);
-}
-
-// Pre-load initialization
-document.addEventListener("DOMContentLoaded", () => {
-    if(localStorage.getItem('ferrovia_save')) {
-        document.getElementById('btn-continue').style.display = 'inline-block';
+// Ambient Sound Loop
+setInterval(() => {
+    if(!STATE.isRunning) return;
+    const r = Math.random();
+    if(r < 0.3) {
+        SOUNDS.ambient_hammer();
+        setTimeout(() => SOUNDS.ambient_hammer(), 400);
+    } else if (r < 0.6) {
+        SOUNDS.ambient_spark();
     } else {
-        document.getElementById('btn-continue').style.display = 'none';
+        SOUNDS.ambient_engine();
     }
-});
+}, 5000);
+
+// Start loop
+animate();
 
 </script>
 </body>
