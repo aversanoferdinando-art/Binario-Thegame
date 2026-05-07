@@ -13,8 +13,8 @@ let audioCtx = null;
 let activeVehicle = null;
 let cameraMode = 0;
 let gameStarted = false;
-let lastSafePlayerPosition = new THREE.Vector3();
 let isMobileDevice = false;
+let lastSafePlayerPosition = new THREE.Vector3();
 
 const keys = Object.create(null);
 const colliders = [];
@@ -22,7 +22,10 @@ const interactionZones = [];
 const fasteningPoints = [];
 const tampingMarkers = [];
 const constructionLights = [];
+const compactedPatches = [];
 const workObjects = {};
+const materials = {};
+const dom = {};
 
 const touchInput = {
   active: false,
@@ -34,31 +37,40 @@ const touchInput = {
 };
 
 const world = {
-  trackLength: 190,
-  trackSpacing: 5.4,
+  trackLength: 230,
+  trackSpacing: 5.2,
   railGauge: 1.44,
-  sleeperSpacing: 2.4,
+  sleeperSpacing: 2.35,
   workTrackX: 0,
   workRailSideX: 0.72,
+  depotX: 13.5,
   missionStartedAt: 0
 };
 
-const materials = {};
-const dom = {};
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
 
 function clamp01(value) {
-  return Math.max(0, Math.min(1, value));
+  return clamp(value, 0, 1);
 }
 
 function percent(value) {
-  return Math.round(Math.max(0, Math.min(100, value))) + '%';
+  return Math.round(clamp(value, 0, 100)) + '%';
 }
 
 function smoothTowards(current, target, rate, delta) {
   return current + (target - current) * (1 - Math.exp(-rate * delta));
 }
 
+function distanceXZ(a, b) {
+  const dx = a.x - b.x;
+  const dz = a.z - b.z;
+  return Math.sqrt(dx * dx + dz * dz);
+}
+
 function setObjectColor(object, color) {
+  if (!object) return;
   object.traverse(function (child) {
     if (child.isMesh && child.material && child.material.color) {
       child.material.color.set(color);
@@ -83,6 +95,15 @@ function createCylinder(radiusTop, radiusBottom, height, segments, material, x, 
   return mesh;
 }
 
+function createSphere(radius, material, x, y, z, scale) {
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 18, 14), material);
+  mesh.position.set(x || 0, y || 0, z || 0);
+  if (scale) mesh.scale.set(scale.x || 1, scale.y || 1, scale.z || 1);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
 class InteractionZone {
   constructor(name, position, radius, color, visible) {
     this.name = name;
@@ -92,17 +113,17 @@ class InteractionZone {
     this.enabled = true;
 
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(radius * 0.78, radius, 40),
+      new THREE.RingGeometry(radius * 0.74, radius, 42),
       new THREE.MeshBasicMaterial({
         color: color || 0xfacc15,
         transparent: true,
-        opacity: 0.42,
+        opacity: 0.38,
         side: THREE.DoubleSide
       })
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.copy(position);
-    ring.position.y = 0.045;
+    ring.position.y = 0.07;
     ring.visible = visible !== false;
     scene.add(ring);
     this.mesh = ring;
@@ -112,10 +133,10 @@ class InteractionZone {
       new THREE.MeshBasicMaterial({
         color: color || 0xfacc15,
         transparent: true,
-        opacity: 0.88
+        opacity: 0.86
       })
     );
-    arrow.position.set(position.x, 2.5, position.z);
+    arrow.position.set(position.x, 2.8, position.z);
     arrow.rotation.x = Math.PI;
     arrow.visible = visible !== false;
     scene.add(arrow);
@@ -134,34 +155,21 @@ class InteractionZone {
 
   contains(position) {
     if (!this.enabled) return false;
-    const dx = position.x - this.position.x;
-    const dz = position.z - this.position.z;
-    return Math.sqrt(dx * dx + dz * dz) <= this.radius;
+    return distanceXZ(position, this.position) <= this.radius;
   }
 
   update(delta) {
-    this.arrow.position.y = 2.3 + Math.sin(performance.now() * 0.003) * 0.22;
+    this.arrow.position.y = 2.55 + Math.sin(performance.now() * 0.003) * 0.25;
     this.mesh.rotation.z += delta * 0.35;
   }
 }
 
 class RailSegment {
-  constructor(name, startPosition, length, material, oldRail) {
+  constructor(name, startPosition, length, material) {
     this.name = name;
     this.length = length;
-    this.mesh = createBox(0.18, 0.20, length, material, startPosition.x, startPosition.y, startPosition.z);
-    this.mesh.userData.railSegment = this;
-    this.oldRail = !!oldRail;
-    this.attached = false;
+    this.mesh = createBox(0.17, 0.19, length, material, startPosition.x, startPosition.y, startPosition.z);
     scene.add(this.mesh);
-  }
-}
-
-class TrackSection {
-  constructor(index, xPosition) {
-    this.index = index;
-    this.xPosition = xPosition;
-    this.group = createTrack(index, xPosition);
   }
 }
 
@@ -169,10 +177,10 @@ class RailRoadLoader {
   constructor(position) {
     this.group = new THREE.Group();
     this.group.position.copy(position);
-    this.group.rotation.y = Math.PI;
+    this.group.rotation.y = Math.PI * 0.96;
     this.speed = 0;
-    this.maxSpeed = 6.2;
-    this.turnSpeed = 1.15;
+    this.maxSpeed = 6.0;
+    this.turnSpeed = 1.0;
     this.turretAngle = 0;
     this.armAngle = -0.34;
     this.armExtension = 1.1;
@@ -187,73 +195,65 @@ class RailRoadLoader {
 
     this.entryZone = new InteractionZone(
       'loader-entry',
-      position.clone().add(new THREE.Vector3(1.8, 0, 0)),
-      2.1,
+      position.clone().add(new THREE.Vector3(1.9, 0, 0)),
+      2.2,
       0x38bdf8,
       false
     );
-
     interactionZones.push(this.entryZone);
-    colliders.push({ type: 'sphere', center: this.group.position, radius: 2.4, owner: this });
+    colliders.push({ center: this.group.position, radius: 2.6, owner: this });
   }
 
   createModel() {
-    const base = createBox(2.8, 0.55, 4.3, materials.machineOrange, 0, 0.65, 0);
-    const chassis = createBox(3.0, 0.35, 4.8, materials.darkMetal, 0, 0.38, 0);
-    const cabin = createBox(1.15, 1.35, 1.35, materials.glassBlue, -0.75, 1.55, -0.9);
-    const hood = createBox(1.35, 0.85, 1.85, materials.machineOrange, 0.55, 1.1, 0.8);
-    this.group.add(chassis, base, cabin, hood);
+    const chassis = createBox(3.15, 0.35, 5.1, materials.darkMetal, 0, 0.42, 0);
+    const body = createBox(2.7, 0.72, 3.5, materials.loaderYellow, 0.1, 0.9, 0.25);
+    const rear = createBox(1.7, 1.05, 1.8, materials.loaderYellow, 0.1, 1.15, 1.35);
+    const cabin = createBox(1.15, 1.35, 1.25, materials.glassBlue, -0.78, 1.68, -1.0);
+    const cabinFrame = createBox(1.28, 1.48, 1.38, materials.darkMetal, -0.78, 1.62, -1.0);
+    cabinFrame.material = materials.cabinFrame;
+    this.group.add(chassis, body, rear, cabinFrame, cabin);
 
     const wheelPositions = [
-      [-1.25, 0.35, -1.65],
-      [1.25, 0.35, -1.65],
-      [-1.25, 0.35, 1.65],
-      [1.25, 0.35, 1.65]
+      [-1.28, 0.38, -1.75],
+      [1.28, 0.38, -1.75],
+      [-1.28, 0.38, 1.75],
+      [1.28, 0.38, 1.75]
     ];
 
     wheelPositions.forEach((p) => {
-      const wheel = createCylinder(0.45, 0.45, 0.35, 18, materials.tire, p[0], p[1], p[2], { z: Math.PI / 2 });
-      this.group.add(wheel);
+      const wheel = createCylinder(0.48, 0.48, 0.36, 20, materials.tire, p[0], p[1], p[2], { z: Math.PI / 2 });
+      const rim = createCylinder(0.22, 0.22, 0.38, 18, materials.metal, p[0], p[1], p[2], { z: Math.PI / 2 });
+      this.group.add(wheel, rim);
     });
 
-    const railWheelPositions = [
-      [-0.72, 0.16, -1.15],
-      [0.72, 0.16, -1.15],
-      [-0.72, 0.16, 1.15],
-      [0.72, 0.16, 1.15]
-    ];
-
-    railWheelPositions.forEach((p) => {
-      const rw = createCylinder(0.18, 0.18, 0.22, 16, materials.metal, p[0], p[1], p[2], { z: Math.PI / 2 });
-      this.group.add(rw);
+    [-1.15, 1.15].forEach((z) => {
+      [-0.74, 0.74].forEach((x) => {
+        this.group.add(createCylinder(0.17, 0.17, 0.22, 16, materials.railWheel, x, 0.16, z, { z: Math.PI / 2 }));
+      });
     });
 
     this.turret = new THREE.Group();
-    this.turret.position.set(0.25, 1.45, -0.15);
-    this.turret.add(createCylinder(0.55, 0.65, 0.35, 24, materials.darkMetal, 0, 0, 0));
+    this.turret.position.set(0.28, 1.52, -0.35);
+    this.turret.add(createCylinder(0.58, 0.68, 0.34, 24, materials.darkMetal, 0, 0, 0));
     this.group.add(this.turret);
 
     this.armPivot = new THREE.Group();
-    this.armPivot.position.set(0, 0.22, 0);
+    this.armPivot.position.set(0, 0.18, 0);
     this.turret.add(this.armPivot);
 
-    this.armBase = createBox(0.28, 0.28, 2.7, materials.machineOrange, 0, 0.1, 1.35);
-    this.armPivot.add(this.armBase);
-
-    this.armExtensionMesh = createBox(0.22, 0.22, 1.7, materials.machineYellow, 0, 0, 2.62);
-    this.armPivot.add(this.armExtensionMesh);
+    this.armBase = createBox(0.25, 0.28, 2.8, materials.loaderYellow, 0, 0.1, 1.35);
+    this.armExtensionMesh = createBox(0.18, 0.22, 1.75, materials.machineYellow, 0, 0, 2.55);
+    this.armPivot.add(this.armBase, this.armExtensionMesh);
 
     this.grabber = new THREE.Group();
     this.grabber.position.set(0, -0.15, 3.55);
-
-    this.leftClaw = createBox(0.16, 0.55, 0.22, materials.darkMetal, -0.32, 0, 0);
-    this.rightClaw = createBox(0.16, 0.55, 0.22, materials.darkMetal, 0.32, 0, 0);
-    const clawTop = createBox(0.78, 0.14, 0.24, materials.darkMetal, 0, 0.28, 0);
-
+    this.leftClaw = createBox(0.14, 0.65, 0.20, materials.darkMetal, -0.32, 0, 0);
+    this.rightClaw = createBox(0.14, 0.65, 0.20, materials.darkMetal, 0.32, 0, 0);
+    const clawTop = createBox(0.88, 0.13, 0.24, materials.darkMetal, 0, 0.31, 0);
     this.grabber.add(this.leftClaw, this.rightClaw, clawTop);
     this.armPivot.add(this.grabber);
 
-    const beacon = createCylinder(0.16, 0.16, 0.18, 16, materials.lightAmber, -0.75, 2.32, -0.9);
+    const beacon = createCylinder(0.15, 0.15, 0.16, 16, materials.lightAmber, -0.78, 2.55, -1.0);
     this.group.add(beacon);
   }
 
@@ -274,7 +274,7 @@ class RailRoadLoader {
     this.sequence = 'remove-old-rail';
     this.sequenceTime = 0;
     this.carriedRail = railSegment;
-    workPhaseManager.setMessage('Caricatore in presa: la pinza aggancia e solleva lentamente la rotaia vecchia.');
+    workPhaseManager.setMessage('La pinza aggancia la rotaia vecchia: sollevamento e deposito materiale usurato.');
     return true;
   }
 
@@ -283,7 +283,7 @@ class RailRoadLoader {
     this.sequence = 'place-new-rail';
     this.sequenceTime = 0;
     this.carriedRail = railSegment;
-    workPhaseManager.setMessage('Posa guidata: prelievo rotaia nuova dal deposito e allineamento sulla sede corretta.');
+    workPhaseManager.setMessage('Prelievo rotaia nuova dal deposito e posa guidata sulla sede corretta.');
     return true;
   }
 
@@ -292,28 +292,28 @@ class RailRoadLoader {
     const t = this.sequenceTime;
     const rail = this.carriedRail;
 
-    this.turretAngle = smoothTowards(this.turretAngle, -0.65 + Math.sin(t * 1.1) * 0.14, 4, delta);
-    this.armAngle = smoothTowards(this.armAngle, -0.48 + Math.sin(t * 0.8) * 0.08, 4, delta);
+    this.turretAngle = smoothTowards(this.turretAngle, -0.72 + Math.sin(t * 1.1) * 0.12, 4, delta);
+    this.armAngle = smoothTowards(this.armAngle, -0.5 + Math.sin(t * 0.9) * 0.06, 4, delta);
     this.armExtension = smoothTowards(this.armExtension, 1.55, 3, delta);
-    this.grabberClosed = t > 1.2;
+    this.grabberClosed = t > 1.0;
 
     if (t < 1.2) {
       rail.mesh.material.emissive.setHex(0x441100);
-      rail.mesh.position.y = smoothTowards(rail.mesh.position.y, 0.48, 3.5, delta);
-    } else if (t < 4.2) {
-      const p = clamp01((t - 1.2) / 3.0);
-      const target = new THREE.Vector3(world.workRailSideX, 1.45 + p * 1.5, -18 + p * 28);
-      rail.mesh.position.lerp(target, 0.045);
-      rail.mesh.rotation.z = Math.sin(t * 7) * 0.012;
+      rail.mesh.position.y = smoothTowards(rail.mesh.position.y, 0.54, 3.5, delta);
+    } else if (t < 4.4) {
+      const p = clamp01((t - 1.2) / 3.2);
+      const target = new THREE.Vector3(world.workRailSideX, 1.55 + p * 1.45, -16 + p * 30);
+      rail.mesh.position.lerp(target, 0.048);
+      rail.mesh.rotation.z = Math.sin(t * 8) * 0.012;
       workPhaseManager.metrics.railReplacementProgress = 15 + p * 35;
-    } else if (t < 7.4) {
-      const p = clamp01((t - 4.2) / 3.2);
-      const target = new THREE.Vector3(-8.5, 0.62 + (1 - p) * 1.9, 35 + p * 11);
-      rail.mesh.position.lerp(target, 0.052);
+    } else if (t < 7.6) {
+      const p = clamp01((t - 4.4) / 3.2);
+      const target = new THREE.Vector3(world.depotX + 4.5, 0.7 + (1 - p) * 2.2, 38 + p * 18);
+      rail.mesh.position.lerp(target, 0.055);
       rail.mesh.rotation.y = smoothTowards(rail.mesh.rotation.y, 0.18, 3, delta);
       workPhaseManager.metrics.railReplacementProgress = 50 + p * 5;
     } else {
-      rail.mesh.position.set(-8.5, 0.45, 46);
+      rail.mesh.position.set(world.depotX + 4.5, 0.48, 56);
       rail.mesh.rotation.set(0, 0.12, 0);
       rail.mesh.material.emissive.setHex(0x000000);
       this.sequence = null;
@@ -331,29 +331,29 @@ class RailRoadLoader {
     const t = this.sequenceTime;
     const rail = this.carriedRail;
 
-    this.turretAngle = smoothTowards(this.turretAngle, 0.75 - Math.sin(t * 0.9) * 0.16, 4, delta);
-    this.armAngle = smoothTowards(this.armAngle, -0.42 + Math.sin(t * 0.9) * 0.08, 4, delta);
+    this.turretAngle = smoothTowards(this.turretAngle, 0.7 - Math.sin(t * 0.9) * 0.15, 4, delta);
+    this.armAngle = smoothTowards(this.armAngle, -0.42 + Math.sin(t * 0.9) * 0.07, 4, delta);
     this.armExtension = smoothTowards(this.armExtension, 1.65, 3, delta);
-    this.grabberClosed = t > 0.8 && t < 6.7;
+    this.grabberClosed = t > 0.8 && t < 6.8;
 
     if (t < 1.0) {
       rail.mesh.material.emissive.setHex(0x103b23);
-      rail.mesh.position.lerp(new THREE.Vector3(-7.8, 0.8, -46), 0.08);
-    } else if (t < 4.3) {
-      const p = clamp01((t - 1.0) / 3.3);
-      const target = new THREE.Vector3(-7.8 + p * 8.52, 2.6, -46 + p * 28);
+      rail.mesh.position.lerp(new THREE.Vector3(world.depotX + 1.4, 0.9, -48), 0.08);
+    } else if (t < 4.4) {
+      const p = clamp01((t - 1.0) / 3.4);
+      const target = new THREE.Vector3(world.depotX + 1.4 - p * (world.depotX + 0.7), 2.75, -48 + p * 31);
       rail.mesh.position.lerp(target, 0.055);
       rail.mesh.rotation.z = Math.sin(t * 6) * 0.012;
       workPhaseManager.metrics.railReplacementProgress = 55 + p * 25;
-    } else if (t < 7.2) {
-      const p = clamp01((t - 4.3) / 2.9);
-      const target = new THREE.Vector3(world.workRailSideX, 0.48 + (1 - p) * 2.0, -18);
+    } else if (t < 7.3) {
+      const p = clamp01((t - 4.4) / 2.9);
+      const target = new THREE.Vector3(world.workRailSideX, 0.54 + (1 - p) * 2.15, -17);
       rail.mesh.position.lerp(target, 0.055);
       rail.mesh.rotation.y = smoothTowards(rail.mesh.rotation.y, 0, 3, delta);
       rail.mesh.rotation.z = smoothTowards(rail.mesh.rotation.z, 0, 4, delta);
       workPhaseManager.metrics.railReplacementProgress = 80 + p * 20;
     } else {
-      rail.mesh.position.set(world.workRailSideX, 0.48, -18);
+      rail.mesh.position.set(world.workRailSideX, 0.54, -17);
       rail.mesh.rotation.set(0, 0, 0);
       rail.mesh.material.emissive.setHex(0x000000);
       this.sequence = null;
@@ -367,17 +367,14 @@ class RailRoadLoader {
   }
 
   update(delta) {
-    this.entryZone.position.copy(this.group.position).add(new THREE.Vector3(1.8, 0, 0));
+    this.entryZone.position.copy(this.group.position).add(new THREE.Vector3(1.9, 0, 0));
     this.entryZone.mesh.position.x = this.entryZone.position.x;
     this.entryZone.mesh.position.z = this.entryZone.position.z;
     this.entryZone.arrow.position.x = this.entryZone.position.x;
     this.entryZone.arrow.position.z = this.entryZone.position.z;
 
-    if (this.sequence === 'remove-old-rail') {
-      this.animateRailRemoval(delta);
-    } else if (this.sequence === 'place-new-rail') {
-      this.animateRailPlacement(delta);
-    }
+    if (this.sequence === 'remove-old-rail') this.animateRailRemoval(delta);
+    else if (this.sequence === 'place-new-rail') this.animateRailPlacement(delta);
 
     if (this.isControlled && !this.sequence) {
       let forwardInput = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
@@ -386,27 +383,25 @@ class RailRoadLoader {
       if (touchInput.active) {
         forwardInput += -touchInput.y;
         turnInput += -touchInput.x;
-        forwardInput = Math.max(-1, Math.min(1, forwardInput));
-        turnInput = Math.max(-1, Math.min(1, turnInput));
+        forwardInput = clamp(forwardInput, -1, 1);
+        turnInput = clamp(turnInput, -1, 1);
       }
 
-      const targetSpeed = forwardInput * this.maxSpeed;
-      this.speed = smoothTowards(this.speed, targetSpeed, 2.5, delta);
+      this.speed = smoothTowards(this.speed, forwardInput * this.maxSpeed, 2.6, delta);
       this.group.rotation.y += turnInput * this.turnSpeed * delta * (Math.abs(this.speed) > 0.1 ? 1 : 0.45);
 
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.group.quaternion);
       this.group.position.addScaledVector(forward, this.speed * delta);
-      this.group.position.x = Math.max(-15, Math.min(15, this.group.position.x));
-      this.group.position.z = Math.max(-72, Math.min(72, this.group.position.z));
+      this.group.position.x = clamp(this.group.position.x, -11, 18);
+      this.group.position.z = clamp(this.group.position.z, -82, 82);
 
       const turretInput = (keys.KeyL ? 1 : 0) - (keys.KeyJ ? 1 : 0);
-      this.turretAngle += turretInput * 1.3 * delta;
-
       const armInput = (keys.KeyR ? 1 : 0) - (keys.KeyF ? 1 : 0);
       const extensionInput = (keys.KeyT ? 1 : 0) - (keys.KeyG ? 1 : 0);
 
-      this.armAngle = Math.max(-0.9, Math.min(0.28, this.armAngle + armInput * 0.9 * delta));
-      this.armExtension = Math.max(0.5, Math.min(2.15, this.armExtension + extensionInput * 1.0 * delta));
+      this.turretAngle += turretInput * 1.3 * delta;
+      this.armAngle = clamp(this.armAngle + armInput * 0.9 * delta, -0.9, 0.28);
+      this.armExtension = clamp(this.armExtension + extensionInput * 1.0 * delta, 0.5, 2.15);
     } else if (!this.sequence) {
       this.speed = smoothTowards(this.speed, 0, 5, delta);
     }
@@ -425,7 +420,7 @@ class TampingMachine {
     this.group.rotation.y = 0;
     this.isControlled = false;
     this.speed = 0;
-    this.maxSpeed = 3.2;
+    this.maxSpeed = 3.0;
     this.cycleActive = false;
     this.cycleTime = 0;
     this.tampedCount = 0;
@@ -439,28 +434,30 @@ class TampingMachine {
 
     this.entryZone = new InteractionZone(
       'tamper-entry',
-      position.clone().add(new THREE.Vector3(1.8, 0, 0)),
-      2.2,
+      position.clone().add(new THREE.Vector3(2.0, 0, 0)),
+      2.4,
       0xf97316,
       false
     );
-
     interactionZones.push(this.entryZone);
-    colliders.push({ type: 'sphere', center: this.group.position, radius: 3.3, owner: this });
+    colliders.push({ center: this.group.position, radius: 3.6, owner: this });
   }
 
   createModel() {
-    const body = createBox(2.7, 1.15, 7.6, materials.machineYellow, 0, 1.22, 0);
-    const lower = createBox(2.25, 0.42, 8.2, materials.darkMetal, 0, 0.55, 0);
-    const cabinA = createBox(2.2, 1.3, 1.45, materials.glassBlue, 0, 2.0, -2.75);
-    const cabinB = createBox(2.0, 1.15, 1.25, materials.glassBlue, 0, 1.95, 2.85);
-    this.group.add(body, lower, cabinA, cabinB);
+    const body = createBox(2.8, 1.2, 8.6, materials.tamperGreen, 0, 1.22, 0);
+    const lower = createBox(2.38, 0.42, 9.0, materials.darkMetal, 0, 0.55, 0);
+    const stripe = createBox(2.86, 0.18, 7.9, materials.machineYellow, 0, 1.55, 0.2);
+    const cabinA = createBox(2.25, 1.25, 1.45, materials.glassBlue, 0, 2.0, -3.2);
+    const cabinB = createBox(2.08, 1.08, 1.25, materials.glassBlue, 0, 1.95, 3.2);
+    const roofA = createBox(2.45, 0.18, 1.65, materials.darkMetal, 0, 2.72, -3.2);
+    const roofB = createBox(2.25, 0.16, 1.45, materials.darkMetal, 0, 2.55, 3.2);
+    this.group.add(body, lower, stripe, cabinA, cabinB, roofA, roofB);
 
-    [-2.75, 2.75].forEach((z) => {
+    [-3.0, 3.0].forEach((z) => {
       const axle = createBox(1.75, 0.16, 0.25, materials.metal, 0, 0.28, z);
       this.group.add(axle);
       [-0.82, 0.82].forEach((x) => {
-        this.group.add(createCylinder(0.28, 0.28, 0.25, 20, materials.darkMetal, x, 0.22, z, { z: Math.PI / 2 }));
+        this.group.add(createCylinder(0.29, 0.29, 0.25, 20, materials.darkMetal, x, 0.22, z, { z: Math.PI / 2 }));
       });
     });
 
@@ -468,17 +465,17 @@ class TampingMachine {
     this.tampingHead.position.set(0, 0.85, 0.1);
     this.group.add(this.tampingHead);
 
-    const headFrame = createBox(2.5, 0.25, 1.0, materials.darkMetal, 0, 0.5, 0);
+    const headFrame = createBox(2.65, 0.25, 1.05, materials.darkMetal, 0, 0.5, 0);
     this.tampingHead.add(headFrame);
 
-    [-0.92, -0.54, 0.54, 0.92].forEach((x) => {
-      const tine = createBox(0.08, 1.25, 0.10, materials.metal, x, -0.22, 0);
+    [-1.02, -0.62, 0.62, 1.02].forEach((x) => {
+      const tine = createBox(0.08, 1.35, 0.10, materials.metal, x, -0.25, 0);
       this.tampingHead.add(tine);
       this.tines.push(tine);
     });
 
-    const lightA = createCylinder(0.12, 0.12, 0.10, 16, materials.lightAmber, -0.9, 2.7, -3.3);
-    const lightB = createCylinder(0.12, 0.12, 0.10, 16, materials.lightAmber, 0.9, 2.7, -3.3);
+    const lightA = createCylinder(0.12, 0.12, 0.10, 16, materials.lightAmber, -0.9, 2.75, -3.85);
+    const lightB = createCylinder(0.12, 0.12, 0.10, 16, materials.lightAmber, 0.9, 2.75, -3.85);
     this.group.add(lightA, lightB);
 
     for (let i = 0; i < 26; i++) {
@@ -504,7 +501,7 @@ class TampingMachine {
     this.cycleTime = 0;
     this.speed = 0;
     playTone(85, 0.25, 'sawtooth');
-    workPhaseManager.setMessage('Ciclo rincalzatura: i martelli scendono, vibrano e compattano il ballast vicino alla traversa.');
+    workPhaseManager.setMessage('Ciclo rincalzatura: abbassamento martelli, vibrazione, compattazione e risalita.');
     return true;
   }
 
@@ -516,14 +513,14 @@ class TampingMachine {
     let dustOpacity = 0;
 
     if (t < 0.8) {
-      headY = 0.85 - (t / 0.8) * 0.55;
+      headY = 0.85 - (t / 0.8) * 0.58;
     } else if (t < 2.7) {
-      headY = 0.30;
-      vibration = Math.sin(t * 80) * 0.045;
+      headY = 0.27;
+      vibration = Math.sin(t * 84) * 0.045;
       dustOpacity = 0.65;
       workPhaseManager.metrics.ballastCompaction = Math.min(100, workPhaseManager.metrics.ballastCompaction + delta * 3.5);
     } else if (t < 3.55) {
-      headY = 0.30 + ((t - 2.7) / 0.85) * 0.55;
+      headY = 0.27 + ((t - 2.7) / 0.85) * 0.58;
       dustOpacity = 0.24;
     } else {
       this.cycleActive = false;
@@ -540,14 +537,13 @@ class TampingMachine {
       if (this.tampedCount < 10) {
         const nextZ = tampingMarkers[this.targetIndex].position.z;
         this.autoMoveTarget = new THREE.Vector3(world.workTrackX, 0, nextZ);
-        workPhaseManager.setMessage('Ciclo completato. La rincalzatrice avanza verso la traversa successiva.');
+        workPhaseManager.setMessage('Ciclo completato. Avanzamento verso la traversa successiva.');
       } else {
         workPhaseManager.completeCurrentPhase();
       }
     }
 
     this.tampingHead.position.y = headY;
-
     this.tines.forEach((tine, index) => {
       tine.rotation.z = vibration * (index % 2 === 0 ? 1 : -1);
     });
@@ -561,7 +557,7 @@ class TampingMachine {
   }
 
   update(delta) {
-    this.entryZone.position.copy(this.group.position).add(new THREE.Vector3(1.8, 0, 0));
+    this.entryZone.position.copy(this.group.position).add(new THREE.Vector3(2.0, 0, 0));
     this.entryZone.mesh.position.x = this.entryZone.position.x;
     this.entryZone.mesh.position.z = this.entryZone.position.z;
     this.entryZone.arrow.position.x = this.entryZone.position.x;
@@ -582,7 +578,7 @@ class TampingMachine {
       if (Math.abs(dz) < 0.08) {
         this.group.position.z = this.autoMoveTarget.z;
         this.autoMoveTarget = null;
-        workPhaseManager.setMessage('Allineato alla traversa: premi AZIONE per avviare il prossimo ciclo di rincalzatura.');
+        workPhaseManager.setMessage('Allineato alla traversa: premi AZIONE per il prossimo ciclo.');
       } else {
         this.group.position.z += Math.sign(dz) * Math.min(Math.abs(dz), 2.0 * delta);
       }
@@ -591,16 +587,15 @@ class TampingMachine {
 
     if (this.isControlled) {
       let forwardInput = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
-
       if (touchInput.active) {
         forwardInput += -touchInput.y;
-        forwardInput = Math.max(-1, Math.min(1, forwardInput));
+        forwardInput = clamp(forwardInput, -1, 1);
       }
 
       this.speed = smoothTowards(this.speed, forwardInput * this.maxSpeed, 2.8, delta);
       this.group.position.z += this.speed * delta;
       this.group.position.x = world.workTrackX;
-      this.group.position.z = Math.max(-55, Math.min(46, this.group.position.z));
+      this.group.position.z = clamp(this.group.position.z, -64, 55);
     } else {
       this.speed = smoothTowards(this.speed, 0, 5, delta);
     }
@@ -625,8 +620,8 @@ class WorkPhaseManager {
     this.phases = [
       {
         name: 'ISPEZIONE INIZIALE',
-        objective: 'Avvicinati al binario di lavoro evidenziato.',
-        controls: 'Joystick: movimento · CAM: cambia visuale · HUD: mostra/nasconde pannello',
+        objective: 'Raggiungi la zona evidenziata sul binario centrale.',
+        controls: 'Joystick/WASD: movimento · CAM/C: cambia visuale · HUD: pannello',
         onEnter: () => {
           workObjects.inspectionZone.setVisible(true);
           this.setMessage('Zona ispezione evidenziata: entra nell’area gialla sul binario centrale.');
@@ -638,8 +633,8 @@ class WorkPhaseManager {
       },
       {
         name: 'PREPARAZIONE CANTIERE',
-        objective: 'Premi E sul punto di avvio per attivare sicurezza, luci e indicatori.',
-        controls: 'Joystick: movimento · E: conferma punto lavoro · CAM: cambia camera',
+        objective: 'Premi E sul punto blu per attivare sicurezza, luci e indicatori.',
+        controls: 'Joystick/WASD: movimento · E: conferma punto lavoro',
         onEnter: () => {
           workObjects.inspectionZone.setVisible(false);
           workObjects.prepZone.setVisible(true);
@@ -650,43 +645,43 @@ class WorkPhaseManager {
         }
       },
       {
-        name: 'RIMOZIONE ROTAIA VECCHIA',
-        objective: 'Sali sul caricatore strada-rotaia e avvia la rimozione della rotaia evidenziata.',
-        controls: 'E: sali/scendi · Joystick: guida mezzo · AZIONE: avvia rimozione',
+        name: 'RIMOZIONE ROTAIA',
+        objective: 'Sali sul caricatore strada-rotaia e avvia il sollevamento della rotaia vecchia.',
+        controls: 'E: sali/scendi · Joystick/WASD: guida · AZIONE/Space: rimozione',
         onEnter: () => {
           workObjects.prepZone.setVisible(false);
           workObjects.oldRail.mesh.material.emissive.setHex(0x662200);
           loader.entryZone.setVisible(activeVehicle !== loader);
-          this.setMessage('Rotaia vecchia evidenziata in arancio. Sali sul caricatore e premi AZIONE.');
+          this.setMessage('Rotaia vecchia evidenziata. Sali sul caricatore e premi AZIONE.');
         },
         update: () => {
-          this.phaseProgress = Math.max(0, Math.min(100, this.metrics.railReplacementProgress / 55 * 100));
+          this.phaseProgress = clamp(this.metrics.railReplacementProgress / 55 * 100, 0, 100);
           loader.entryZone.setVisible(activeVehicle !== loader && this.phaseIndex === 2);
         }
       },
       {
         name: 'POSA ROTAIA NUOVA',
-        objective: 'Usa il caricatore per prendere la rotaia nuova dal deposito e posarla sulle traverse.',
-        controls: 'Dentro il caricatore: AZIONE avvia la posa guidata · Joystick: guida mezzo',
+        objective: 'Preleva la rotaia nuova dal deposito e posala sulle traverse.',
+        controls: 'Dentro il caricatore: AZIONE/Space avvia posa guidata',
         onEnter: () => {
           loader.entryZone.setVisible(activeVehicle !== loader);
           workObjects.newRail.mesh.material.emissive.setHex(0x164e2b);
-          this.setMessage('Rotaia nuova pronta nel deposito. Premi AZIONE dentro al caricatore per iniziare la posa.');
+          this.setMessage('Rotaia nuova pronta nel deposito. Premi AZIONE dentro al caricatore.');
         },
         update: () => {
-          this.phaseProgress = Math.max(0, Math.min(100, (this.metrics.railReplacementProgress - 55) / 45 * 100));
+          this.phaseProgress = clamp((this.metrics.railReplacementProgress - 55) / 45 * 100, 0, 100);
           loader.entryZone.setVisible(activeVehicle !== loader && this.phaseIndex === 3);
         }
       },
       {
         name: 'FISSAGGIO ROTAIA',
-        objective: 'Completa gli attacchi evidenziati: avvicinati a ogni punto e premi E.',
-        controls: 'Joystick: movimento · E: fissa punto evidenziato · CAM: cambia camera',
+        objective: 'Chiudi 6 punti di attacco evidenziati lungo la rotaia.',
+        controls: 'Joystick/WASD: movimento · E: fissa attacco',
         onEnter: () => {
           if (activeVehicle) exitVehicle();
           loader.entryZone.setVisible(false);
           fasteningPoints.forEach((zone) => zone.setVisible(true));
-          this.setMessage('Fissa la rotaia nuova: 6 punti da completare. Ogni punto diventa verde.');
+          this.setMessage('Fissa la rotaia nuova: ogni marker completato diventa verde.');
         },
         update: () => {
           const completed = fasteningPoints.filter((zone) => zone.completed).length;
@@ -697,13 +692,13 @@ class WorkPhaseManager {
       },
       {
         name: 'RINCALZATURA BINARIO',
-        objective: 'Sali sulla rincalzatrice, allineati alle traverse e premi AZIONE per ogni ciclo.',
-        controls: 'E: sali/scendi · Joystick su/giù: avanzamento · AZIONE: ciclo rincalzatura',
+        objective: 'Sali sulla rincalzatrice e completa almeno 8-10 cicli sulle traverse.',
+        controls: 'E: sali/scendi · Joystick su/giù: avanza · AZIONE/Space: rincalza',
         onEnter: () => {
           fasteningPoints.forEach((zone) => zone.setVisible(false));
           tamper.entryZone.setVisible(activeVehicle !== tamper);
           tampingMarkers.forEach((zone, index) => zone.setVisible(index < 10));
-          this.setMessage('Rincalza almeno 8-10 traverse. I martelli devono scendere e vibrare nel ballast.');
+          this.setMessage('Rincalzatura: i martelli devono scendere, vibrare e compattare il ballast.');
         },
         update: () => {
           this.phaseProgress = this.metrics.tampingProgress;
@@ -717,17 +712,16 @@ class WorkPhaseManager {
       },
       {
         name: 'CONTROLLO FINALE',
-        objective: 'Verifica soglie finali: rotaia, fissaggio, rincalzatura, geometria e sicurezza.',
-        controls: 'CAM: cambia camera · MENU: menu',
+        objective: 'Verifica rotaia, fissaggio, compattazione, geometria e sicurezza.',
+        controls: 'CAM/C: cambia visuale · MENU/Esc: menu',
         onEnter: () => {
           if (activeVehicle) exitVehicle();
           tamper.entryZone.setVisible(false);
           tampingMarkers.forEach((zone) => zone.setVisible(false));
-          this.setMessage('Controllo finale in corso: tutti i parametri devono essere sopra soglia.');
+          this.setMessage('Controllo finale: tutti i parametri devono essere sopra soglia.');
         },
         update: (delta) => {
           const m = this.metrics;
-
           const checks = [
             m.railReplacementProgress >= 100,
             m.fasteningProgress >= 100,
@@ -744,7 +738,7 @@ class WorkPhaseManager {
             m.ballastCompaction = smoothTowards(m.ballastCompaction, 88, 1.8, delta);
             showFinalScreen();
           } else {
-            this.setMessage('Soglie non raggiunte: completa le fasi precedenti prima della consegna finale.');
+            this.setMessage('Soglie non raggiunte: completa le fasi precedenti.');
           }
         }
       }
@@ -791,14 +785,13 @@ class WorkPhaseManager {
 
     if (phase === 4) {
       const nearest = fasteningPoints.find((zone) => !zone.completed && zone.contains(player.position));
-
       if (nearest) {
         nearest.completed = true;
         nearest.setColor(0x22c55e);
         nearest.mesh.material.opacity = 0.28;
         addFasteningPlate(nearest.position);
         playTone(240, 0.07, 'square');
-        this.setMessage('Attacco chiuso correttamente. Passa al prossimo punto evidenziato.');
+        this.setMessage('Attacco chiuso. Passa al prossimo punto evidenziato.');
       }
     }
   }
@@ -823,11 +816,8 @@ class WorkPhaseManager {
     }
 
     if (this.phaseIndex === 5) {
-      if (activeVehicle === tamper) {
-        tamper.startCycle();
-      } else {
-        this.setMessage('Devi prima salire sulla rincalzatrice: premi E vicino al mezzo.');
-      }
+      if (activeVehicle === tamper) tamper.startCycle();
+      else this.setMessage('Devi prima salire sulla rincalzatrice: premi E vicino al mezzo.');
     }
   }
 
@@ -849,6 +839,7 @@ class WorkPhaseManager {
 }
 
 function init() {
+  isMobileDevice = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 900;
   cacheDom();
   clock = new THREE.Clock();
   createScene();
@@ -857,10 +848,13 @@ function init() {
 }
 
 function cacheDom() {
+  dom.splashScreen = document.getElementById('splashScreen');
+  dom.splashEnterButton = document.getElementById('splashEnterButton');
   dom.menuScreen = document.getElementById('menuScreen');
   dom.playButton = document.getElementById('playButton');
   dom.restartButton = document.getElementById('restartButton');
   dom.hud = document.getElementById('hud');
+  dom.hudClose = document.getElementById('hudClose');
   dom.finalScreen = document.getElementById('finalScreen');
   dom.phaseName = document.getElementById('phaseName');
   dom.phaseObjective = document.getElementById('phaseObjective');
@@ -874,8 +868,8 @@ function cacheDom() {
   dom.safetyText = document.getElementById('safetyText');
   dom.controlsText = document.getElementById('controlsText');
   dom.messageText = document.getElementById('messageText');
+  dom.taskList = document.getElementById('taskList');
   dom.interactionHint = document.getElementById('interactionHint');
-
   dom.mobileControls = document.getElementById('mobileControls');
   dom.touchStick = document.getElementById('touchStick');
   dom.touchKnob = document.getElementById('touchKnob');
@@ -889,37 +883,26 @@ function cacheDom() {
 function createScene() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xbfd7ee);
-  scene.fog = new THREE.Fog(0xbfd7ee, 65, 240);
+  scene.fog = new THREE.Fog(0xbfd7ee, 95, 330);
 
-  camera = new THREE.PerspectiveCamera(64, window.innerWidth / window.innerHeight, 0.1, 500);
-  camera.position.set(0, 8, 12);
+  camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 600);
+  camera.position.set(18, 18, 34);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobileDevice ? 1.45 : 1.75));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !isMobileDevice;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
   document.getElementById('gameRoot').appendChild(renderer.domElement);
 
   createMaterials();
-
-  const hemi = new THREE.HemisphereLight(0xdbeafe, 0x5b4636, 0.78);
-  scene.add(hemi);
-
-  const sun = new THREE.DirectionalLight(0xffffff, 0.95);
-  sun.position.set(-22, 32, 14);
-  sun.castShadow = true;
-  sun.shadow.camera.left = -55;
-  sun.shadow.camera.right = 55;
-  sun.shadow.camera.top = 75;
-  sun.shadow.camera.bottom = -75;
-  sun.shadow.mapSize.width = 2048;
-  sun.shadow.mapSize.height = 2048;
-  scene.add(sun);
-
-  createSkyDetails();
+  createLights();
+  createTerrain();
   createRailYard();
+  createDepotArea();
+  createRailwayBuildings();
+  createVegetation();
+  createWorkers();
   createPlayer();
   createRailRoadLoader();
   createTampingMachine();
@@ -929,58 +912,92 @@ function createScene() {
 }
 
 function createMaterials() {
-  materials.ground = new THREE.MeshLambertMaterial({ color: 0x7a6a4a });
-  materials.groundDark = new THREE.MeshLambertMaterial({ color: 0x5f553f });
-  materials.ballast = new THREE.MeshLambertMaterial({ color: 0x6f7680 });
-  materials.ballastDark = new THREE.MeshLambertMaterial({ color: 0x4b5563 });
-  materials.ballastLight = new THREE.MeshLambertMaterial({ color: 0x9ca3af });
-  materials.rail = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.32, metalness: 0.72 });
-  materials.railOld = new THREE.MeshStandardMaterial({ color: 0x5a382b, roughness: 0.7, metalness: 0.45, emissive: 0x000000 });
-  materials.railNew = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.22, metalness: 0.86, emissive: 0x000000 });
-  materials.sleeper = new THREE.MeshLambertMaterial({ color: 0x7b5a3a });
-  materials.sleeperConcrete = new THREE.MeshLambertMaterial({ color: 0xa3a3a3 });
+  materials.ground = new THREE.MeshLambertMaterial({ color: 0x6f7d4e });
+  materials.grass = new THREE.MeshLambertMaterial({ color: 0x4d7c3f });
+  materials.dirt = new THREE.MeshLambertMaterial({ color: 0x8a7356 });
+  materials.depotGround = new THREE.MeshLambertMaterial({ color: 0x8b8f8f });
+  materials.ballast = new THREE.MeshLambertMaterial({ color: 0x7f8790 });
+  materials.ballastDark = new THREE.MeshLambertMaterial({ color: 0x505a63 });
+  materials.ballastLight = new THREE.MeshLambertMaterial({ color: 0xb6bec8 });
+  materials.rail = new THREE.MeshStandardMaterial({ color: 0x463329, roughness: 0.38, metalness: 0.72 });
+  materials.railSide = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.35, metalness: 0.78 });
+  materials.railOld = new THREE.MeshStandardMaterial({ color: 0x5b3425, roughness: 0.72, metalness: 0.42, emissive: 0x000000 });
+  materials.railNew = new THREE.MeshStandardMaterial({ color: 0xa9b2bd, roughness: 0.22, metalness: 0.86, emissive: 0x000000 });
+  materials.sleeper = new THREE.MeshLambertMaterial({ color: 0x7b5130 });
+  materials.sleeperConcrete = new THREE.MeshLambertMaterial({ color: 0xb7b7b1 });
   materials.metal = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.38, metalness: 0.72 });
-  materials.darkMetal = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.45, metalness: 0.58 });
+  materials.darkMetal = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.48, metalness: 0.58 });
+  materials.railWheel = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.35, metalness: 0.85 });
   materials.tire = new THREE.MeshLambertMaterial({ color: 0x0f172a });
-  materials.machineOrange = new THREE.MeshLambertMaterial({ color: 0xf97316 });
+  materials.loaderYellow = new THREE.MeshLambertMaterial({ color: 0xf2c230 });
   materials.machineYellow = new THREE.MeshLambertMaterial({ color: 0xfacc15 });
-  materials.glassBlue = new THREE.MeshStandardMaterial({
-    color: 0x60a5fa,
-    roughness: 0.15,
-    metalness: 0.05,
-    transparent: true,
-    opacity: 0.72
-  });
+  materials.tamperGreen = new THREE.MeshLambertMaterial({ color: 0x2f8a4d });
+  materials.glassBlue = new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.68 });
+  materials.cabinFrame = new THREE.MeshLambertMaterial({ color: 0x334155, transparent: true, opacity: 0.35 });
   materials.lightAmber = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0x331800, roughness: 0.25 });
   materials.cone = new THREE.MeshLambertMaterial({ color: 0xf97316 });
   materials.white = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
   materials.green = new THREE.MeshLambertMaterial({ color: 0x22c55e });
   materials.red = new THREE.MeshLambertMaterial({ color: 0xef4444 });
+  materials.brick = new THREE.MeshLambertMaterial({ color: 0x9b4d32 });
+  materials.roof = new THREE.MeshLambertMaterial({ color: 0x7c2d12 });
+  materials.woodStack = new THREE.MeshLambertMaterial({ color: 0x5c3b24 });
+  materials.workerOrange = new THREE.MeshLambertMaterial({ color: 0xf97316 });
 }
 
-function createSkyDetails() {
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(70, 240, 10, 30), materials.ground);
-  ground.rotation.x = -Math.PI / 2;
+function createLights() {
+  const hemi = new THREE.HemisphereLight(0xdbeafe, 0x6b4f30, 0.82);
+  scene.add(hemi);
+
+  const sun = new THREE.DirectionalLight(0xffffff, 0.95);
+  sun.position.set(-38, 48, 26);
+  sun.castShadow = !isMobileDevice;
+  sun.shadow.camera.left = -80;
+  sun.shadow.camera.right = 80;
+  sun.shadow.camera.top = 95;
+  sun.shadow.camera.bottom = -95;
+  sun.shadow.mapSize.width = 2048;
+  sun.shadow.mapSize.height = 2048;
+  scene.add(sun);
+}
+
+function createTerrain() {
+  const width = 120;
+  const depth = 300;
+  const geometry = new THREE.PlaneGeometry(width, depth, 34, 80);
+  geometry.rotateX(-Math.PI / 2);
+
+  const pos = geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    let y = Math.sin(z * 0.025) * 0.55 + Math.cos(x * 0.09) * 0.35;
+    if (Math.abs(x) < 17) y *= 0.16;
+    if (x > 7 && x < 29 && z > -70 && z < 72) y = 0.02;
+    pos.setY(i, y);
+  }
+  geometry.computeVertexNormals();
+
+  const ground = new THREE.Mesh(geometry, materials.ground);
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const serviceRoad = createBox(7, 0.035, 215, materials.groundDark, -12.5, 0.035, 0);
-  serviceRoad.receiveShadow = true;
-  scene.add(serviceRoad);
+  const workStrip = createBox(16, 0.04, 246, materials.dirt, 0, 0.045, 0);
+  workStrip.receiveShadow = true;
+  scene.add(workStrip);
 
-  for (let i = 0; i < 22; i++) {
-    const z = -95 + i * 9;
-    const post = createCylinder(0.08, 0.08, 2.5, 8, materials.darkMetal, 16 + Math.sin(i) * 0.7, 1.25, z);
-    const lamp = createCylinder(0.18, 0.18, 0.12, 16, materials.lightAmber, 16, 2.55, z, { z: Math.PI / 2 });
-    lamp.visible = i % 3 === 0;
-    scene.add(post, lamp);
-  }
+  const depotPad = createBox(25, 0.06, 140, materials.depotGround, world.depotX + 5, 0.07, 0);
+  depotPad.receiveShadow = true;
+  scene.add(depotPad);
+
+  const serviceRoad = createBox(7, 0.04, 220, materials.dirt, -19.5, 0.075, 0);
+  scene.add(serviceRoad);
 }
 
 function createRailYard() {
-  const trackXs = [-world.trackSpacing, 0, world.trackSpacing];
-  trackXs.forEach((x, index) => new TrackSection(index, x));
-  createWorkMaterials();
+  [-world.trackSpacing, 0, world.trackSpacing].forEach((x, index) => {
+    createTrack(index, x);
+  });
 }
 
 function createTrack(index, xPosition) {
@@ -993,61 +1010,53 @@ function createTrack(index, xPosition) {
   createRails(group, xPosition, index);
 
   if (index === 2) createSimpleSwitch(group, xPosition);
-
   return group;
 }
 
 function createBallastBed(group, xPosition, index) {
-  const bed = createBox(4.25, 0.28, world.trackLength, materials.ballastDark, xPosition, 0.14, 0);
+  const bedWidth = index === 1 ? 4.8 : 4.2;
+  const bed = createBox(bedWidth, 0.3, world.trackLength, materials.ballastDark, xPosition, 0.18, 0);
   bed.receiveShadow = true;
   group.add(bed);
 
-  const leftShoulder = createBox(0.9, 0.52, world.trackLength, materials.ballast, xPosition - 2.55, 0.25, 0);
+  const leftShoulder = createBox(1.0, 0.58, world.trackLength, materials.ballast, xPosition - bedWidth / 2 - 0.45, 0.3, 0);
+  const rightShoulder = createBox(1.0, 0.58, world.trackLength, materials.ballast, xPosition + bedWidth / 2 + 0.45, 0.3, 0);
   leftShoulder.rotation.z = -0.09;
-
-  const rightShoulder = createBox(0.9, 0.52, world.trackLength, materials.ballast, xPosition + 2.55, 0.25, 0);
   rightShoulder.rotation.z = 0.09;
-
   group.add(leftShoulder, rightShoulder);
 
   const stoneGeo = new THREE.DodecahedronGeometry(0.075, 0);
-  const mats = [materials.ballast, materials.ballastDark, materials.ballastLight];
-  const stoneCount = isMobileDevice ? 130 : 260;
-  const mesh = new THREE.InstancedMesh(stoneGeo, mats[index % mats.length], stoneCount);
-  mesh.castShadow = false;
-  mesh.receiveShadow = true;
-
+  const stoneCount = isMobileDevice ? 170 : 360;
+  const mesh = new THREE.InstancedMesh(stoneGeo, index % 2 ? materials.ballastLight : materials.ballast, stoneCount);
   const dummy = new THREE.Object3D();
 
   for (let i = 0; i < stoneCount; i++) {
-    const sideBias = Math.random() < 0.38
-      ? (Math.random() < 0.5 ? -1 : 1) * (1.45 + Math.random() * 1.35)
-      : (Math.random() - 0.5) * 2.5;
+    const sideBias = Math.random() < 0.42
+      ? (Math.random() < 0.5 ? -1 : 1) * (1.45 + Math.random() * 1.55)
+      : (Math.random() - 0.5) * 2.65;
 
     dummy.position.set(
       xPosition + sideBias,
-      0.36 + Math.random() * 0.28,
+      0.42 + Math.random() * 0.28,
       -world.trackLength / 2 + Math.random() * world.trackLength
     );
-
     dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-
-    const scale = 0.75 + Math.random() * 1.85;
-    dummy.scale.set(scale, 0.6 + Math.random() * 0.8, scale);
+    const s = 0.75 + Math.random() * 1.8;
+    dummy.scale.set(s, 0.55 + Math.random() * 0.75, s);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
   }
 
+  mesh.receiveShadow = true;
   group.add(mesh);
 }
 
 function createSleepers(group, xPosition, index) {
   const count = Math.floor(world.trackLength / world.sleeperSpacing);
-
   for (let i = 0; i < count; i++) {
     const z = -world.trackLength / 2 + i * world.sleeperSpacing;
-    const material = index === 1 && i % 4 === 0 ? materials.sleeperConcrete : materials.sleeper;
-    const sleeper = createBox(3.1, 0.22, 0.34, material, xPosition, 0.38, z);
+    const material = index === 1 && i % 3 === 0 ? materials.sleeperConcrete : materials.sleeper;
+    const sleeper = createBox(3.05, 0.22, 0.34, material, xPosition, 0.43, z);
     sleeper.rotation.y = (Math.random() - 0.5) * 0.018;
     group.add(sleeper);
   }
@@ -1058,35 +1067,28 @@ function createRails(group, xPosition, index) {
   const rightX = xPosition + world.railGauge / 2;
 
   if (index === 1) {
-    const leftRail = createBox(0.18, 0.2, world.trackLength, materials.rail, leftX, 0.52, 0);
-    group.add(leftRail);
-    workObjects.oldRail = new RailSegment('old-work-rail', new THREE.Vector3(rightX, 0.52, -18), 72, materials.railOld, true);
+    group.add(createBox(0.16, 0.19, world.trackLength, materials.railSide, leftX, 0.58, 0));
+    group.add(createBox(0.28, 0.07, world.trackLength, materials.railSide, leftX, 0.72, 0));
+    workObjects.oldRail = new RailSegment('old-work-rail', new THREE.Vector3(rightX, 0.58, -17), 78, materials.railOld);
   } else {
-    group.add(createBox(0.18, 0.2, world.trackLength, materials.rail, leftX, 0.52, 0));
-    group.add(createBox(0.18, 0.2, world.trackLength, materials.rail, rightX, 0.52, 0));
-  }
-
-  const topLeft = createBox(0.32, 0.08, world.trackLength, materials.rail, leftX, 0.66, 0);
-  const topRight = createBox(0.32, 0.08, world.trackLength, materials.rail, rightX, 0.66, 0);
-
-  if (index === 1) {
-    group.add(topLeft);
-  } else {
-    group.add(topLeft, topRight);
+    [leftX, rightX].forEach((x) => {
+      group.add(createBox(0.16, 0.19, world.trackLength, materials.rail, x, 0.58, 0));
+      group.add(createBox(0.28, 0.07, world.trackLength, materials.railSide, x, 0.72, 0));
+    });
   }
 }
 
 function createSimpleSwitch(group, xPosition) {
   const switchGroup = new THREE.Group();
-  switchGroup.position.set(xPosition, 0.69, 30);
+  switchGroup.position.set(xPosition, 0.75, 38);
 
-  const divergingA = createBox(0.12, 0.08, 28, materials.rail, 0.7, 0, 0);
-  const divergingB = createBox(0.12, 0.08, 28, materials.rail, 1.55, 0, 0);
-  divergingA.rotation.y = -0.16;
-  divergingB.rotation.y = -0.16;
+  const divergingA = createBox(0.12, 0.08, 34, materials.rail, 0.7, 0, 0);
+  const divergingB = createBox(0.12, 0.08, 34, materials.rail, 1.55, 0, 0);
+  divergingA.rotation.y = -0.15;
+  divergingB.rotation.y = -0.15;
 
-  const pointBladeA = createBox(0.10, 0.09, 10, materials.railNew, -0.2, 0.02, -7);
-  const pointBladeB = createBox(0.10, 0.09, 10, materials.railNew, 0.4, 0.02, -7);
+  const pointBladeA = createBox(0.10, 0.08, 11, materials.railNew, -0.2, 0.02, -8);
+  const pointBladeB = createBox(0.10, 0.08, 11, materials.railNew, 0.4, 0.02, -8);
   pointBladeA.rotation.y = -0.07;
   pointBladeB.rotation.y = -0.05;
 
@@ -1094,129 +1096,196 @@ function createSimpleSwitch(group, xPosition) {
   group.add(switchGroup);
 }
 
-function createWorkMaterials() {
+function createDepotArea() {
   const depot = new THREE.Group();
-  depot.name = 'MaterialDepot';
+  depot.name = 'DepotArea';
   scene.add(depot);
 
-  for (let i = 0; i < 5; i++) {
-    const rail = createBox(0.16, 0.17, 34, i === 0 ? materials.railNew : materials.rail, -7.8 - i * 0.35, 0.45 + i * 0.12, -46);
-    rail.rotation.y = 0.02 * i;
+  for (let i = 0; i < 7; i++) {
+    const rail = createBox(0.15, 0.16, 42, i < 2 ? materials.railNew : materials.rail, world.depotX + 1.2 + i * 0.35, 0.45 + i * 0.08, -48);
+    rail.rotation.y = 0.02;
     depot.add(rail);
   }
 
-  workObjects.newRail = new RailSegment('new-work-rail', new THREE.Vector3(-7.8, 0.94, -46), 72, materials.railNew, false);
+  workObjects.newRail = new RailSegment('new-work-rail', new THREE.Vector3(world.depotX + 1.4, 0.94, -48), 78, materials.railNew);
   workObjects.newRail.mesh.rotation.y = 0.02;
 
-  for (let i = 0; i < 14; i++) {
-    const sleeper = createBox(
-      3.1,
-      0.18,
-      0.32,
-      i % 2 ? materials.sleeper : materials.sleeperConcrete,
-      -12.5,
-      0.22 + i * 0.08,
-      -26 + (i % 7) * 0.43
-    );
-    sleeper.rotation.y = Math.PI / 2 + (Math.random() - 0.5) * 0.04;
-    depot.add(sleeper);
+  for (let stack = 0; stack < 4; stack++) {
+    for (let i = 0; i < 10; i++) {
+      const sleeper = createBox(3.1, 0.18, 0.32, stack % 2 ? materials.sleeper : materials.sleeperConcrete, world.depotX + 7 + stack * 3.4, 0.22 + i * 0.18, -14 + (i % 2) * 0.08);
+      sleeper.rotation.y = Math.PI / 2;
+      depot.add(sleeper);
+    }
+  }
+
+  for (let row = 0; row < 3; row++) {
+    for (let i = 0; i < 12; i++) {
+      const rail = createBox(0.13, 0.15, 24, materials.railOld, world.depotX + 1.4 + row * 0.55, 0.45 + i * 0.05, 30 + row * 3.2);
+      rail.rotation.y = Math.PI / 2;
+      depot.add(rail);
+    }
   }
 
   const barrierGroup = new THREE.Group();
   workObjects.barrierGroup = barrierGroup;
   scene.add(barrierGroup);
-
-  for (let i = 0; i < 12; i++) {
-    const z = -30 + i * 5.3;
+  for (let i = 0; i < 14; i++) {
+    const z = -42 + i * 6.2;
     const side = i % 2 === 0 ? -1 : 1;
-    const cone = createConeBarrier(side * 3.5, z);
-    barrierGroup.add(cone);
-  }
-
-  for (let i = 0; i < 4; i++) {
-    const sign = createSafetySign(-4.2, 0.2, -25 + i * 16, i % 2 === 0 ? 'STOP' : 'PPE');
-    scene.add(sign);
+    barrierGroup.add(createConeBarrier(side * 3.9, z));
   }
 
   for (let i = 0; i < 5; i++) {
     const tower = new THREE.Group();
-    tower.position.set(-5.2, 0, -35 + i * 18);
-
-    tower.add(createCylinder(0.07, 0.07, 2.2, 8, materials.darkMetal, 0, 1.1, 0));
-
-    const lamp = createBox(0.55, 0.35, 0.18, materials.lightAmber, 0.1, 2.28, 0);
+    tower.position.set(4.7, 0, -48 + i * 24);
+    tower.add(createCylinder(0.07, 0.07, 2.4, 8, materials.darkMetal, 0, 1.2, 0));
+    const lamp = createBox(0.55, 0.35, 0.18, materials.lightAmber, 0.1, 2.48, 0);
     lamp.visible = false;
     tower.add(lamp);
-
     constructionLights.push(lamp);
     scene.add(tower);
   }
 
-  colliders.push({ type: 'sphere', center: new THREE.Vector3(-9, 0, -38), radius: 4.4, owner: depot });
+  for (let i = 0; i < 5; i++) {
+    const pallet = createBox(1.3, 0.18, 1.0, materials.woodStack, world.depotX + 9 + i * 2.1, 0.2, 36);
+    depot.add(pallet);
+  }
+
+  colliders.push({ center: new THREE.Vector3(world.depotX + 8, 0, -14), radius: 6.6, owner: depot });
 }
 
 function createConeBarrier(x, z) {
   const group = new THREE.Group();
   group.position.set(x, 0, z);
-
   const cone = createCylinder(0.05, 0.32, 0.78, 16, materials.cone, 0, 0.39, 0);
   const stripe = createCylinder(0.052, 0.23, 0.08, 16, materials.white, 0, 0.52, 0);
-
   group.add(cone, stripe);
   return group;
 }
 
-function createSafetySign(x, y, z, label) {
+function createRailwayBuildings() {
+  createBuilding(-18, -62, 7.5, 4.5, 9, 'station');
+  createBuilding(21, -64, 10, 4.0, 7, 'warehouse');
+  createBuilding(25, 14, 6, 3.2, 5, 'technical');
+
+  const platform = createBox(3.2, 0.22, 70, materials.depotGround, -8.6, 0.33, -46);
+  scene.add(platform);
+
+  for (let i = 0; i < 8; i++) {
+    const post = createCylinder(0.055, 0.055, 2.4, 8, materials.darkMetal, -9.7, 1.2, -78 + i * 9);
+    const lamp = createCylinder(0.16, 0.16, 0.1, 16, materials.lightAmber, -9.7, 2.45, -78 + i * 9, { z: Math.PI / 2 });
+    scene.add(post, lamp);
+  }
+}
+
+function createBuilding(x, z, w, h, d, type) {
   const group = new THREE.Group();
-  group.position.set(x, y, z);
+  group.position.set(x, 0, z);
 
-  group.add(createCylinder(0.045, 0.045, 1.4, 8, materials.darkMetal, 0, 0.7, 0));
+  const body = createBox(w, h, d, type === 'warehouse' ? materials.depotGround : materials.brick, 0, h / 2, 0);
+  const roof = createBox(w + 0.7, 0.6, d + 0.7, materials.roof, 0, h + 0.32, 0);
+  roof.rotation.z = 0.02;
 
-  const panelMat = label === 'STOP' ? materials.red : materials.green;
-  group.add(createBox(0.92, 0.62, 0.05, panelMat, 0, 1.45, 0));
+  const door = createBox(1.1, 1.7, 0.08, materials.darkMetal, 0, 0.9, d / 2 + 0.05);
+  const winA = createBox(0.8, 0.65, 0.08, materials.glassBlue, -w * 0.28, h * 0.58, d / 2 + 0.06);
+  const winB = createBox(0.8, 0.65, 0.08, materials.glassBlue, w * 0.28, h * 0.58, d / 2 + 0.06);
 
-  return group;
+  group.add(body, roof, door, winA, winB);
+  scene.add(group);
+  colliders.push({ center: new THREE.Vector3(x, 0, z), radius: Math.max(w, d) * 0.55, owner: group });
+}
+
+function createVegetation() {
+  const grassCount = isMobileDevice ? 180 : 420;
+  const grassGeo = new THREE.ConeGeometry(0.05, 0.65, 5);
+  const grassMesh = new THREE.InstancedMesh(grassGeo, materials.grass, grassCount);
+  const dummy = new THREE.Object3D();
+
+  for (let i = 0; i < grassCount; i++) {
+    let x = (Math.random() - 0.5) * 105;
+    if (Math.abs(x) < 15) x += x < 0 ? -16 : 16;
+    const z = -135 + Math.random() * 270;
+    dummy.position.set(x, 0.36, z);
+    dummy.rotation.y = Math.random() * Math.PI;
+    const s = 0.6 + Math.random() * 1.6;
+    dummy.scale.set(s, s, s);
+    dummy.updateMatrix();
+    grassMesh.setMatrixAt(i, dummy.matrix);
+  }
+  scene.add(grassMesh);
+
+  const treeCount = isMobileDevice ? 28 : 55;
+  for (let i = 0; i < treeCount; i++) {
+    let x = (Math.random() < 0.5 ? -1 : 1) * (25 + Math.random() * 30);
+    const z = -125 + Math.random() * 250;
+    createTree(x, z, 0.8 + Math.random() * 1.5);
+  }
+}
+
+function createTree(x, z, s) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+
+  const trunk = createCylinder(0.16 * s, 0.22 * s, 2.4 * s, 8, materials.woodStack, 0, 1.2 * s, 0);
+  const crown1 = createSphere(1.15 * s, materials.grass, 0, 2.7 * s, 0, { x: 1.1, y: 1, z: 1.1 });
+  const crown2 = createSphere(0.85 * s, materials.grass, -0.55 * s, 2.35 * s, 0.25 * s, { x: 1, y: 0.9, z: 1 });
+  const crown3 = createSphere(0.8 * s, materials.grass, 0.58 * s, 2.45 * s, -0.2 * s, { x: 1, y: 0.9, z: 1 });
+
+  group.add(trunk, crown1, crown2, crown3);
+  scene.add(group);
+}
+
+function createWorkers() {
+  createWorker(world.depotX + 8, -34, Math.PI * 0.6);
+  createWorker(6.2, -8, -Math.PI * 0.2);
+  createWorker(world.depotX + 13, 20, Math.PI * 0.9);
+}
+
+function createWorker(x, z, rot) {
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+  group.rotation.y = rot;
+
+  const legs = createBox(0.34, 0.75, 0.22, materials.darkMetal, 0, 0.45, 0);
+  const body = createBox(0.55, 0.82, 0.28, materials.workerOrange, 0, 1.15, 0);
+  const head = createSphere(0.18, new THREE.MeshLambertMaterial({ color: 0xffc08a }), 0, 1.7, 0);
+  const helmet = createSphere(0.2, materials.machineYellow, 0, 1.84, 0, { x: 1.1, y: 0.45, z: 1.1 });
+
+  group.add(legs, body, head, helmet);
+  scene.add(group);
 }
 
 function createRailRoadLoader() {
-  loader = new RailRoadLoader(new THREE.Vector3(-7.8, 0, 8));
-  return loader;
+  loader = new RailRoadLoader(new THREE.Vector3(4.2, 0, 8));
 }
 
 function createTampingMachine() {
-  tamper = new TampingMachine(new THREE.Vector3(world.workTrackX, 0, -52));
-  return tamper;
+  tamper = new TampingMachine(new THREE.Vector3(world.workTrackX, 0, -58));
 }
 
 function createPlayer() {
   const group = new THREE.Group();
-  group.position.set(-3.8, 0, -38);
+  group.position.set(-3.8, 0, -42);
 
   const body = createCylinder(0.28, 0.33, 1.1, 18, new THREE.MeshLambertMaterial({ color: 0x2563eb }), 0, 1.0, 0);
-
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.24, 18, 18),
-    new THREE.MeshLambertMaterial({ color: 0xffd3a3 })
-  );
+  const vest = createBox(0.5, 0.45, 0.08, materials.workerOrange, 0, 1.16, -0.25);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 18), new THREE.MeshLambertMaterial({ color: 0xffd3a3 }));
   head.position.set(0, 1.7, 0);
   head.castShadow = true;
 
-  const helmet = new THREE.Mesh(
-    new THREE.SphereGeometry(0.27, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-    materials.machineYellow
-  );
+  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.27, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), materials.machineYellow);
   helmet.position.set(0, 1.8, 0);
   helmet.castShadow = true;
 
-  group.add(body, head, helmet);
+  group.add(body, vest, head, helmet);
   scene.add(group);
 
   player = {
-    group: group,
+    group,
     position: group.position,
     velocity: new THREE.Vector3(),
     baseSpeed: 7.0 * 1.4,
-    sprintMultiplier: 1.28,
+    sprintMultiplier: 1.22,
     acceleration: 10.5,
     deceleration: 13.5,
     radius: 0.55,
@@ -1227,22 +1296,20 @@ function createPlayer() {
 }
 
 function createInteractionAndWorkZones() {
-  workObjects.inspectionZone = new InteractionZone('inspection', new THREE.Vector3(0, 0, -24), 4.2, 0xfacc15, false);
+  workObjects.inspectionZone = new InteractionZone('inspection', new THREE.Vector3(0, 0, -25), 4.2, 0xfacc15, false);
   interactionZones.push(workObjects.inspectionZone);
 
-  workObjects.prepZone = new InteractionZone('prep', new THREE.Vector3(-3.6, 0, -28), 2.15, 0x38bdf8, false);
+  workObjects.prepZone = new InteractionZone('prep', new THREE.Vector3(-3.6, 0, -30), 2.15, 0x38bdf8, false);
   interactionZones.push(workObjects.prepZone);
 
-  const fastenZs = [-48, -35, -22, -9, 4, 17];
-
-  fastenZs.forEach((z, index) => {
+  [-50, -36, -22, -8, 6, 20].forEach((z, index) => {
     const zone = new InteractionZone('fastening-' + index, new THREE.Vector3(world.workRailSideX, 0, z), 1.15, 0xfacc15, false);
     fasteningPoints.push(zone);
     interactionZones.push(zone);
   });
 
   for (let i = 0; i < 10; i++) {
-    const z = -46 + i * 4.8;
+    const z = -48 + i * 5.0;
     const zone = new InteractionZone('tamping-' + i, new THREE.Vector3(world.workTrackX, 0, z), 1.45, 0xf97316, false);
     tampingMarkers.push(zone);
     interactionZones.push(zone);
@@ -1250,43 +1317,37 @@ function createInteractionAndWorkZones() {
 }
 
 function addFasteningPlate(position) {
-  const plate = createBox(0.54, 0.06, 0.42, materials.green, position.x, 0.74, position.z);
-  const boltA = createCylinder(0.055, 0.055, 0.08, 12, materials.darkMetal, position.x - 0.17, 0.82, position.z, null);
-  const boltB = createCylinder(0.055, 0.055, 0.08, 12, materials.darkMetal, position.x + 0.17, 0.82, position.z, null);
-
+  const plate = createBox(0.54, 0.06, 0.42, materials.green, position.x, 0.78, position.z);
+  const boltA = createCylinder(0.055, 0.055, 0.08, 12, materials.darkMetal, position.x - 0.17, 0.86, position.z, null);
+  const boltB = createCylinder(0.055, 0.055, 0.08, 12, materials.darkMetal, position.x + 0.17, 0.86, position.z, null);
   scene.add(plate, boltA, boltB);
 }
 
 function compactBallastAt(z) {
-  const patch = createBox(3.4, 0.035, 1.25, materials.ballastLight, world.workTrackX, 0.72, z);
+  const patch = createBox(3.55, 0.035, 1.28, materials.ballastLight, world.workTrackX, 0.82, z);
   patch.material = patch.material.clone();
   patch.material.transparent = true;
   patch.material.opacity = 0.38;
   scene.add(patch);
+  compactedPatches.push(patch);
 }
 
 function bindEvents() {
-  isMobileDevice = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 900;
-
   window.addEventListener('resize', onWindowResize);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('contextmenu', function (event) { event.preventDefault(); });
 
+  dom.splashEnterButton.addEventListener('click', showMainMenu);
   dom.playButton.addEventListener('click', startGame);
   dom.restartButton.addEventListener('click', restartGame);
-
-  dom.hudToggle.addEventListener('click', function () {
-    dom.hud.classList.toggle('mobile-collapsed');
-  });
-
+  dom.hudToggle.addEventListener('click', function () { dom.hud.classList.toggle('mobile-collapsed'); });
+  dom.hudClose.addEventListener('click', function () { dom.hud.classList.add('mobile-collapsed'); });
   setupMobileControls();
 }
 
 function setupMobileControls() {
-  if (!dom.touchStick || !dom.touchKnob) return;
-
   const maxDistance = 42;
-
   function resetStick() {
     touchInput.active = false;
     touchInput.pointerId = null;
@@ -1297,12 +1358,10 @@ function setupMobileControls() {
 
   dom.touchStick.addEventListener('pointerdown', function (event) {
     event.preventDefault();
-
     touchInput.active = true;
     touchInput.pointerId = event.pointerId;
     touchInput.startX = event.clientX;
     touchInput.startY = event.clientY;
-
     dom.touchStick.setPointerCapture(event.pointerId);
   });
 
@@ -1313,15 +1372,12 @@ function setupMobileControls() {
     const dy = event.clientY - touchInput.startY;
     const distance = Math.min(maxDistance, Math.sqrt(dx * dx + dy * dy));
     const angle = Math.atan2(dy, dx);
-
     const knobX = Math.cos(angle) * distance;
     const knobY = Math.sin(angle) * distance;
 
     touchInput.x = knobX / maxDistance;
     touchInput.y = knobY / maxDistance;
-
-    dom.touchKnob.style.transform =
-      'translate(calc(-50% + ' + knobX + 'px), calc(-50% + ' + knobY + 'px))';
+    dom.touchKnob.style.transform = 'translate(calc(-50% + ' + knobX + 'px), calc(-50% + ' + knobY + 'px))';
   });
 
   dom.touchStick.addEventListener('pointerup', resetStick);
@@ -1354,28 +1410,27 @@ function setupMobileControls() {
 
   dom.mobileMenu.addEventListener('click', function () {
     if (!gameStarted) return;
-
-    if (activeVehicle) {
-      exitVehicle();
-    } else {
-      dom.menuScreen.classList.toggle('hidden');
-    }
+    if (activeVehicle) exitVehicle();
+    else dom.menuScreen.classList.toggle('hidden');
   });
+}
+
+function showMainMenu() {
+  dom.splashScreen.classList.add('hidden');
+  dom.menuScreen.classList.remove('hidden');
+  ensureAudio();
 }
 
 function startGame() {
   gameStarted = true;
   world.missionStartedAt = performance.now();
-
   dom.menuScreen.classList.add('hidden');
   dom.hud.classList.remove('hidden');
-
   if (isMobileDevice) {
     dom.mobileControls.classList.remove('hidden');
     dom.hudToggle.classList.remove('hidden');
     dom.hud.classList.add('mobile-collapsed');
   }
-
   ensureAudio();
 }
 
@@ -1385,19 +1440,16 @@ function restartGame() {
 
 function showFinalScreen() {
   if (!dom.finalScreen.classList.contains('hidden')) return;
-
   dom.finalScreen.classList.remove('hidden');
-
   playTone(440, 0.12, 'triangle');
   setTimeout(() => playTone(660, 0.12, 'triangle'), 120);
 }
 
 function onWindowResize() {
   isMobileDevice = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 900;
-
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobileDevice ? 1.45 : 1.75));
   renderer.setSize(window.innerWidth, window.innerHeight);
 
   if (gameStarted && isMobileDevice) {
@@ -1408,7 +1460,6 @@ function onWindowResize() {
 
 function onKeyDown(event) {
   keys[event.code] = true;
-
   if (!gameStarted) return;
 
   if (event.code === 'KeyE') {
@@ -1418,7 +1469,6 @@ function onKeyDown(event) {
 
   if (event.code === 'Space') {
     event.preventDefault();
-
     if (activeVehicle === loader && (workPhaseManager.phaseIndex === 2 || workPhaseManager.phaseIndex === 3)) {
       workPhaseManager.handleAction();
     } else if (activeVehicle === tamper && workPhaseManager.phaseIndex === 5) {
@@ -1444,24 +1494,22 @@ function onKeyUp(event) {
 
 function enterVehicle(vehicle, desiredCameraMode) {
   activeVehicle = vehicle;
-
   if (vehicle === loader) loader.setControlled(true);
   if (vehicle === tamper) tamper.setControlled(true);
-
   player.group.visible = false;
   cameraMode = desiredCameraMode;
 
   workPhaseManager.setMessage(
     vehicle === loader
       ? 'Sei sul caricatore strada-rotaia. Usa AZIONE per avviare la lavorazione guidata.'
-      : 'Sei sulla rincalzatrice. Premi AZIONE per il ciclo di rincalzatura sulla traversa evidenziata.'
+      : 'Sei sulla rincalzatrice. Premi AZIONE per il ciclo sulla traversa evidenziata.'
   );
 }
 
 function exitVehicle() {
   if (!activeVehicle) return;
 
-  const exitPos = activeVehicle.group.position.clone().add(new THREE.Vector3(2.0, 0, 0));
+  const exitPos = activeVehicle.group.position.clone().add(new THREE.Vector3(2.1, 0, 0));
   player.position.copy(exitPos);
   player.group.visible = true;
 
@@ -1476,7 +1524,6 @@ function updatePlayer(delta) {
   if (!gameStarted || activeVehicle) return;
 
   const input = new THREE.Vector3();
-
   if (keys.KeyW || keys.ArrowUp) input.z -= 1;
   if (keys.KeyS || keys.ArrowDown) input.z += 1;
   if (keys.KeyA || keys.ArrowLeft) input.x -= 1;
@@ -1498,9 +1545,8 @@ function updatePlayer(delta) {
 
   lastSafePlayerPosition.copy(player.position);
   player.position.addScaledVector(player.velocity, delta);
-
-  player.position.x = Math.max(-20, Math.min(20, player.position.x));
-  player.position.z = Math.max(-90, Math.min(90, player.position.z));
+  player.position.x = clamp(player.position.x, -28, 30);
+  player.position.z = clamp(player.position.z, -118, 118);
 
   if (collidesWithMainObjects(player.position)) {
     player.position.copy(lastSafePlayerPosition);
@@ -1517,16 +1563,9 @@ function updatePlayer(delta) {
 function collidesWithMainObjects(pos) {
   for (let i = 0; i < colliders.length; i++) {
     const c = colliders[i];
-
     if (activeVehicle && c.owner === activeVehicle) continue;
-
-    const center = c.center;
-    const dx = pos.x - center.x;
-    const dz = pos.z - center.z;
-
-    if (Math.sqrt(dx * dx + dz * dz) < c.radius + player.radius) return true;
+    if (distanceXZ(pos, c.center) < c.radius + player.radius) return true;
   }
-
   return false;
 }
 
@@ -1591,6 +1630,13 @@ function updateHUD() {
 
   dom.controlsText.textContent = phase.controls;
   dom.messageText.textContent = workPhaseManager.message;
+
+  const items = dom.taskList ? dom.taskList.querySelectorAll('li') : [];
+  items.forEach((item) => {
+    const step = Number(item.getAttribute('data-step'));
+    item.classList.toggle('done', step < workPhaseManager.phaseIndex);
+    item.classList.toggle('active', step === workPhaseManager.phaseIndex);
+  });
 }
 
 function updateCamera(delta) {
@@ -1599,24 +1645,23 @@ function updateCamera(delta) {
 
   if (cameraMode === 0) {
     const base = activeVehicle ? activeVehicle.group.position : player.position;
-
     if (isMobileDevice) {
-      targetPos.set(base.x, base.y + 6.6, base.z + 10.5);
-      lookAt.set(base.x, base.y + 1.0, base.z - 2.2);
+      targetPos.set(base.x, base.y + 7.0, base.z + 11.5);
+      lookAt.set(base.x, base.y + 1.1, base.z - 2.3);
     } else {
-      targetPos.set(base.x, base.y + 5.2, base.z + 8.5);
-      lookAt.set(base.x, base.y + 1.0, base.z);
+      targetPos.set(base.x, base.y + 5.6, base.z + 9.2);
+      lookAt.set(base.x, base.y + 1.1, base.z);
     }
   } else if (cameraMode === 1) {
     const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(loader.group.quaternion);
-    targetPos.copy(loader.group.position).addScaledVector(forward, isMobileDevice ? 11 : 9).add(new THREE.Vector3(0, isMobileDevice ? 5.4 : 4.2, 0));
-    lookAt.copy(loader.group.position).add(new THREE.Vector3(0, 1.4, 0));
+    targetPos.copy(loader.group.position).addScaledVector(forward, isMobileDevice ? 12 : 9.5).add(new THREE.Vector3(0, isMobileDevice ? 5.8 : 4.4, 0));
+    lookAt.copy(loader.group.position).add(new THREE.Vector3(0, 1.45, 0));
   } else if (cameraMode === 2) {
-    targetPos.copy(tamper.group.position).add(new THREE.Vector3(0, isMobileDevice ? 6.2 : 5.2, isMobileDevice ? 12 : 10));
-    lookAt.copy(tamper.group.position).add(new THREE.Vector3(0, 1.3, -2.5));
+    targetPos.copy(tamper.group.position).add(new THREE.Vector3(0, isMobileDevice ? 6.5 : 5.4, isMobileDevice ? 13 : 10.5));
+    lookAt.copy(tamper.group.position).add(new THREE.Vector3(0, 1.4, -2.6));
   } else {
-    targetPos.set(17, 31, 44);
-    lookAt.set(0, 0, -10);
+    targetPos.set(30, 31, 58);
+    lookAt.set(2, 0, -18);
   }
 
   camera.position.lerp(targetPos, 1 - Math.exp(-5 * delta));
@@ -1632,7 +1677,6 @@ function ensureAudio() {
 
 function playTone(frequency, duration, type) {
   ensureAudio();
-
   if (!audioCtx) return;
 
   const osc = audioCtx.createOscillator();
@@ -1654,16 +1698,13 @@ function playTone(frequency, duration, type) {
 
 function animate() {
   requestAnimationFrame(animate);
-
   const delta = Math.min(clock.getDelta(), 0.05);
-
   updatePlayer(delta);
   updateVehicles(delta);
   updateWorkPhases(delta);
   updateInteractionHints(delta);
   updateHUD();
   updateCamera(delta);
-
   renderer.render(scene, camera);
 }
 
