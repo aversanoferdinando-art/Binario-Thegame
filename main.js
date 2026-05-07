@@ -17,11 +17,22 @@ let lastSafePlayerPosition = new THREE.Vector3();
 
 const keys = Object.create(null);
 const colliders = [];
+const touchInput = {
+  active: false,
+  pointerId: null,
+  startX: 0,
+  startY: 0,
+  x: 0,
+  y: 0
+};
+
+let isMobileDevice = false;
 const interactionZones = [];
 const fasteningPoints = [];
 const tampingMarkers = [];
 const constructionLights = [];
 const workObjects = {};
+
 
 const world = {
   trackLength: 190,
