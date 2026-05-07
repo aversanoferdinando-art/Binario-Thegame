@@ -1,1739 +1,581 @@
-/* global THREE */
-'use strict';
-
-let scene;
-let camera;
-let renderer;
-let clock;
-let player;
-let loader;
-let tamper;
-let workPhaseManager;
-let audioCtx = null;
-let activeVehicle = null;
-let cameraMode = 0;
-let gameStarted = false;
-let isMobileDevice = false;
-let lastSafePlayerPosition = new THREE.Vector3();
-
-const keys = Object.create(null);
-const colliders = [];
-const interactionZones = [];
-const fasteningPoints = [];
-const tampingMarkers = [];
-const constructionLights = [];
-const workObjects = {};
-const materials = {};
-const dom = {};
-
-const touchInput = {
-  active: false,
-  pointerId: null,
-  startX: 0,
-  startY: 0,
-  x: 0,
-  y: 0
-};
-
-const world = {
-  trackLength: 230,
-  trackSpacing: 5.2,
-  railGauge: 1.44,
-  sleeperSpacing: 2.35,
-  workTrackX: 0,
-  workRailSideX: 0.72,
-  depotX: 13.5
-};
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
-function clamp01(value) {
-  return clamp(value, 0, 1);
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #0f172a;
+  color: #f8fafc;
+  touch-action: none;
+  overscroll-behavior: none;
 }
 
-function percent(value) {
-  return Math.round(clamp(value, 0, 100)) + '%';
+#gameRoot {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
 }
 
-function smoothTowards(current, target, rate, delta) {
-  return current + (target - current) * (1 - Math.exp(-rate * delta));
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
-function distanceXZ(a, b) {
-  const dx = a.x - b.x;
-  const dz = a.z - b.z;
-  return Math.sqrt(dx * dx + dz * dz);
+.hidden,
+.screen.hidden,
+.splash-screen.hidden {
+  display: none !important;
 }
 
-function setObjectColor(object, color) {
-  if (!object) return;
-  object.traverse(function (child) {
-    if (child.isMesh && child.material && child.material.color) child.material.color.set(color);
-  });
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 24px;
+  background:
+    linear-gradient(90deg, rgba(2, 6, 23, 0.70), rgba(2, 6, 23, 0.16), rgba(2, 6, 23, 0.72)),
+    url("splash.jpg") center / cover no-repeat,
+    radial-gradient(circle at center, #1f2937, #020617);
 }
 
-function createBox(w, h, d, material, x, y, z) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
-  mesh.position.set(x || 0, y || 0, z || 0);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
+.splash-panel {
+  width: min(620px, 94vw);
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(226, 232, 240, 0.22);
+  background: rgba(2, 6, 23, 0.64);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(10px);
+  text-align: center;
 }
 
-function createCylinder(radiusTop, radiusBottom, height, segments, material, x, y, z, rotation) {
-  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments), material);
-  mesh.position.set(x || 0, y || 0, z || 0);
-  if (rotation) mesh.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
+.splash-kicker,
+.eyebrow,
+.hud-kicker {
+  margin: 0;
+  color: #facc15;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
-function createSphere(radius, material, x, y, z, scale) {
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 18, 14), material);
-  mesh.position.set(x || 0, y || 0, z || 0);
-  if (scale) mesh.scale.set(scale.x || 1, scale.y || 1, scale.z || 1);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
+.splash-panel h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2.2rem, 8vw, 5.2rem);
+  line-height: 0.84;
+  letter-spacing: -0.07em;
+  text-transform: uppercase;
+  text-shadow: 0 5px 22px rgba(0, 0, 0, 0.75);
 }
 
-class InteractionZone {
-  constructor(name, position, radius, color, visible) {
-    this.name = name;
-    this.position = position.clone();
-    this.radius = radius;
-    this.completed = false;
-    this.enabled = true;
-
-    this.mesh = new THREE.Mesh(
-      new THREE.RingGeometry(radius * 0.74, radius, 42),
-      new THREE.MeshBasicMaterial({
-        color: color || 0xfacc15,
-        transparent: true,
-        opacity: 0.38,
-        side: THREE.DoubleSide
-      })
-    );
-    this.mesh.rotation.x = -Math.PI / 2;
-    this.mesh.position.copy(position);
-    this.mesh.position.y = 0.07;
-    this.mesh.visible = visible !== false;
-    scene.add(this.mesh);
-
-    this.arrow = new THREE.Mesh(
-      new THREE.ConeGeometry(0.32, 0.9, 18),
-      new THREE.MeshBasicMaterial({
-        color: color || 0xfacc15,
-        transparent: true,
-        opacity: 0.86
-      })
-    );
-    this.arrow.position.set(position.x, 2.8, position.z);
-    this.arrow.rotation.x = Math.PI;
-    this.arrow.visible = visible !== false;
-    scene.add(this.arrow);
-  }
-
-  setVisible(value) {
-    this.mesh.visible = value;
-    this.arrow.visible = value;
-  }
-
-  setColor(color) {
-    this.mesh.material.color.set(color);
-    this.arrow.material.color.set(color);
-  }
-
-  contains(position) {
-    return this.enabled && distanceXZ(position, this.position) <= this.radius;
-  }
-
-  update(delta) {
-    this.arrow.position.y = 2.55 + Math.sin(performance.now() * 0.003) * 0.25;
-    this.mesh.rotation.z += delta * 0.35;
-  }
+.splash-panel h1 span {
+  font-size: 0.45em;
+  letter-spacing: 0.18em;
+  color: #e5e7eb;
 }
 
-class RailSegment {
-  constructor(name, startPosition, length, material) {
-    this.name = name;
-    this.length = length;
-    this.mesh = createBox(0.17, 0.19, length, material, startPosition.x, startPosition.y, startPosition.z);
-    scene.add(this.mesh);
-  }
+.splash-panel p {
+  margin: 0 auto 14px;
+  max-width: 52ch;
+  color: #dbeafe;
+  line-height: 1.45;
+  font-size: 0.92rem;
 }
 
-class RailRoadLoader {
-  constructor(position) {
-    this.group = new THREE.Group();
-    this.group.position.copy(position);
-    this.group.rotation.y = Math.PI * 0.96;
-    this.speed = 0;
-    this.maxSpeed = 6.0;
-    this.turnSpeed = 1.0;
-    this.turretAngle = 0;
-    this.armAngle = -0.34;
-    this.armExtension = 1.1;
-    this.grabberClosed = false;
-    this.isControlled = false;
-    this.sequence = null;
-    this.sequenceTime = 0;
-    this.carriedRail = null;
-
-    this.createModel();
-    scene.add(this.group);
-
-    this.entryZone = new InteractionZone(
-      'loader-entry',
-      position.clone().add(new THREE.Vector3(1.9, 0, 0)),
-      3.3,
-      0x38bdf8,
-      false
-    );
-    interactionZones.push(this.entryZone);
-    colliders.push({ center: this.group.position, radius: 2.6, owner: this });
-  }
-
-  createModel() {
-    const chassis = createBox(3.15, 0.35, 5.1, materials.darkMetal, 0, 0.42, 0);
-    const body = createBox(2.7, 0.72, 3.5, materials.loaderYellow, 0.1, 0.9, 0.25);
-    const rear = createBox(1.7, 1.05, 1.8, materials.loaderYellow, 0.1, 1.15, 1.35);
-    const cabinFrame = createBox(1.28, 1.48, 1.38, materials.cabinFrame, -0.78, 1.62, -1.0);
-    const cabin = createBox(1.15, 1.35, 1.25, materials.glassBlue, -0.78, 1.68, -1.0);
-    this.group.add(chassis, body, rear, cabinFrame, cabin);
-
-    [[-1.28, -1.75], [1.28, -1.75], [-1.28, 1.75], [1.28, 1.75]].forEach((p) => {
-      const wheel = createCylinder(0.48, 0.48, 0.36, 20, materials.tire, p[0], 0.38, p[1], { z: Math.PI / 2 });
-      const rim = createCylinder(0.22, 0.22, 0.38, 18, materials.metal, p[0], 0.38, p[1], { z: Math.PI / 2 });
-      this.group.add(wheel, rim);
-    });
-
-    [-1.15, 1.15].forEach((z) => {
-      [-0.74, 0.74].forEach((x) => {
-        this.group.add(createCylinder(0.17, 0.17, 0.22, 16, materials.railWheel, x, 0.16, z, { z: Math.PI / 2 }));
-      });
-    });
-
-    this.turret = new THREE.Group();
-    this.turret.position.set(0.28, 1.52, -0.35);
-    this.turret.add(createCylinder(0.58, 0.68, 0.34, 24, materials.darkMetal, 0, 0, 0));
-    this.group.add(this.turret);
-
-    this.armPivot = new THREE.Group();
-    this.armPivot.position.set(0, 0.18, 0);
-    this.turret.add(this.armPivot);
-
-    this.armBase = createBox(0.25, 0.28, 2.8, materials.loaderYellow, 0, 0.1, 1.35);
-    this.armExtensionMesh = createBox(0.18, 0.22, 1.75, materials.machineYellow, 0, 0, 2.55);
-    this.armPivot.add(this.armBase, this.armExtensionMesh);
-
-    this.grabber = new THREE.Group();
-    this.grabber.position.set(0, -0.15, 3.55);
-    this.leftClaw = createBox(0.14, 0.65, 0.20, materials.darkMetal, -0.32, 0, 0);
-    this.rightClaw = createBox(0.14, 0.65, 0.20, materials.darkMetal, 0.32, 0, 0);
-    const clawTop = createBox(0.88, 0.13, 0.24, materials.darkMetal, 0, 0.31, 0);
-    this.grabber.add(this.leftClaw, this.rightClaw, clawTop);
-    this.armPivot.add(this.grabber);
-
-    const beacon = createCylinder(0.15, 0.15, 0.16, 16, materials.lightAmber, -0.78, 2.55, -1.0);
-    this.group.add(beacon);
-  }
-
-  setControlled(value) {
-    this.isControlled = value;
-    this.entryZone.setVisible(!value && workPhaseManager && (workPhaseManager.phaseIndex === 2 || workPhaseManager.phaseIndex === 3));
-  }
-
-  toggleGrabber() {
-    this.grabberClosed = !this.grabberClosed;
-    this.leftClaw.position.x = this.grabberClosed ? -0.18 : -0.32;
-    this.rightClaw.position.x = this.grabberClosed ? 0.18 : 0.32;
-    playTone(this.grabberClosed ? 180 : 130, 0.05, 'square');
-  }
-
-  startRemoveSequence(railSegment) {
-    if (this.sequence) return false;
-    this.sequence = 'remove-old-rail';
-    this.sequenceTime = 0;
-    this.carriedRail = railSegment;
-    workPhaseManager.setMessage('La pinza aggancia la rotaia vecchia: sollevamento e deposito materiale usurato.');
-    return true;
-  }
-
-  startPlaceSequence(railSegment) {
-    if (this.sequence) return false;
-    this.sequence = 'place-new-rail';
-    this.sequenceTime = 0;
-    this.carriedRail = railSegment;
-    workPhaseManager.setMessage('Prelievo rotaia nuova dal deposito e posa guidata sulla sede corretta.');
-    return true;
-  }
-
-  animateRailRemoval(delta) {
-    this.sequenceTime += delta;
-    const t = this.sequenceTime;
-    const rail = this.carriedRail;
-
-    this.turretAngle = smoothTowards(this.turretAngle, -0.72 + Math.sin(t * 1.1) * 0.12, 4, delta);
-    this.armAngle = smoothTowards(this.armAngle, -0.5 + Math.sin(t * 0.9) * 0.06, 4, delta);
-    this.armExtension = smoothTowards(this.armExtension, 1.55, 3, delta);
-    this.grabberClosed = t > 1.0;
-
-    if (t < 1.2) {
-      rail.mesh.material.emissive.setHex(0x441100);
-      rail.mesh.position.y = smoothTowards(rail.mesh.position.y, 0.54, 3.5, delta);
-    } else if (t < 4.4) {
-      const p = clamp01((t - 1.2) / 3.2);
-      rail.mesh.position.lerp(new THREE.Vector3(world.workRailSideX, 1.55 + p * 1.45, -16 + p * 30), 0.048);
-      rail.mesh.rotation.z = Math.sin(t * 8) * 0.012;
-      workPhaseManager.metrics.railReplacementProgress = 15 + p * 35;
-    } else if (t < 7.6) {
-      const p = clamp01((t - 4.4) / 3.2);
-      rail.mesh.position.lerp(new THREE.Vector3(world.depotX + 4.5, 0.7 + (1 - p) * 2.2, 38 + p * 18), 0.055);
-      rail.mesh.rotation.y = smoothTowards(rail.mesh.rotation.y, 0.18, 3, delta);
-      workPhaseManager.metrics.railReplacementProgress = 50 + p * 5;
-    } else {
-      rail.mesh.position.set(world.depotX + 4.5, 0.48, 56);
-      rail.mesh.rotation.set(0, 0.12, 0);
-      rail.mesh.material.emissive.setHex(0x000000);
-      this.sequence = null;
-      this.carriedRail = null;
-      workPhaseManager.metrics.railReplacementProgress = 55;
-      workPhaseManager.completeCurrentPhase();
-    }
-
-    this.leftClaw.position.x = this.grabberClosed ? -0.18 : -0.32;
-    this.rightClaw.position.x = this.grabberClosed ? 0.18 : 0.32;
-  }
-
-  animateRailPlacement(delta) {
-    this.sequenceTime += delta;
-    const t = this.sequenceTime;
-    const rail = this.carriedRail;
-
-    this.turretAngle = smoothTowards(this.turretAngle, 0.7 - Math.sin(t * 0.9) * 0.15, 4, delta);
-    this.armAngle = smoothTowards(this.armAngle, -0.42 + Math.sin(t * 0.9) * 0.07, 4, delta);
-    this.armExtension = smoothTowards(this.armExtension, 1.65, 3, delta);
-    this.grabberClosed = t > 0.8 && t < 6.8;
-
-    if (t < 1.0) {
-      rail.mesh.material.emissive.setHex(0x103b23);
-      rail.mesh.position.lerp(new THREE.Vector3(world.depotX + 1.4, 0.9, -48), 0.08);
-    } else if (t < 4.4) {
-      const p = clamp01((t - 1.0) / 3.4);
-      rail.mesh.position.lerp(new THREE.Vector3(world.depotX + 1.4 - p * (world.depotX + 0.7), 2.75, -48 + p * 31), 0.055);
-      rail.mesh.rotation.z = Math.sin(t * 6) * 0.012;
-      workPhaseManager.metrics.railReplacementProgress = 55 + p * 25;
-    } else if (t < 7.3) {
-      const p = clamp01((t - 4.4) / 2.9);
-      rail.mesh.position.lerp(new THREE.Vector3(world.workRailSideX, 0.54 + (1 - p) * 2.15, -17), 0.055);
-      rail.mesh.rotation.y = smoothTowards(rail.mesh.rotation.y, 0, 3, delta);
-      rail.mesh.rotation.z = smoothTowards(rail.mesh.rotation.z, 0, 4, delta);
-      workPhaseManager.metrics.railReplacementProgress = 80 + p * 20;
-    } else {
-      rail.mesh.position.set(world.workRailSideX, 0.54, -17);
-      rail.mesh.rotation.set(0, 0, 0);
-      rail.mesh.material.emissive.setHex(0x000000);
-      this.sequence = null;
-      this.carriedRail = null;
-      workPhaseManager.metrics.railReplacementProgress = 100;
-      workPhaseManager.completeCurrentPhase();
-    }
-
-    this.leftClaw.position.x = this.grabberClosed ? -0.18 : -0.32;
-    this.rightClaw.position.x = this.grabberClosed ? 0.18 : 0.32;
-  }
-
-  update(delta) {
-    this.entryZone.position.copy(this.group.position).add(new THREE.Vector3(1.9, 0, 0));
-    this.entryZone.mesh.position.x = this.entryZone.position.x;
-    this.entryZone.mesh.position.z = this.entryZone.position.z;
-    this.entryZone.arrow.position.x = this.entryZone.position.x;
-    this.entryZone.arrow.position.z = this.entryZone.position.z;
-
-    if (this.sequence === 'remove-old-rail') this.animateRailRemoval(delta);
-    else if (this.sequence === 'place-new-rail') this.animateRailPlacement(delta);
-
-    if (this.isControlled && !this.sequence) {
-      let forwardInput = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
-      let turnInput = (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0);
-
-      if (touchInput.active) {
-        forwardInput = clamp(forwardInput + -touchInput.y, -1, 1);
-        turnInput = clamp(turnInput + -touchInput.x, -1, 1);
-      }
-
-      this.speed = smoothTowards(this.speed, forwardInput * this.maxSpeed, 2.6, delta);
-      this.group.rotation.y += turnInput * this.turnSpeed * delta * (Math.abs(this.speed) > 0.1 ? 1 : 0.45);
-
-      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.group.quaternion);
-      this.group.position.addScaledVector(forward, this.speed * delta);
-      this.group.position.x = clamp(this.group.position.x, -11, 18);
-      this.group.position.z = clamp(this.group.position.z, -82, 82);
-    } else if (!this.sequence) {
-      this.speed = smoothTowards(this.speed, 0, 5, delta);
-    }
-
-    this.turret.rotation.y = this.turretAngle;
-    this.armPivot.rotation.x = this.armAngle;
-    this.armExtensionMesh.position.z = 2.12 + this.armExtension * 0.34;
-    this.grabber.position.z = 2.85 + this.armExtension * 0.72;
-  }
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background:
+    radial-gradient(circle at 28% 22%, rgba(56, 189, 248, 0.22), transparent 36%),
+    linear-gradient(135deg, rgba(2, 6, 23, 0.96), rgba(15, 23, 42, 0.96));
 }
 
-class TampingMachine {
-  constructor(position) {
-    this.group = new THREE.Group();
-    this.group.position.copy(position);
-    this.group.rotation.y = 0;
-    this.isControlled = false;
-    this.speed = 0;
-    this.maxSpeed = 3.0;
-    this.cycleActive = false;
-    this.cycleTime = 0;
-    this.tampedCount = 0;
-    this.targetIndex = 0;
-    this.tines = [];
-    this.dustParticles = [];
-    this.autoMoveTarget = null;
+.menu-card {
+  width: min(680px, 94vw);
+  padding: 30px;
+  border: 1px solid rgba(226, 232, 240, 0.16);
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.86);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(18px);
+}
 
-    this.createModel();
-    scene.add(this.group);
+.menu-card h1,
+.menu-card h2 {
+  margin: 8px 0 16px;
+  font-size: clamp(2rem, 6vw, 4.2rem);
+  line-height: 0.96;
+  letter-spacing: -0.055em;
+}
 
-    this.entryZone = new InteractionZone(
-      'tamper-entry',
-      position.clone().add(new THREE.Vector3(2.0, 0, 0)),
-      3.5,
-      0xf97316,
-      false
-    );
-    interactionZones.push(this.entryZone);
-    colliders.push({ center: this.group.position, radius: 3.6, owner: this });
+.menu-card p {
+  max-width: 58ch;
+  color: #cbd5e1;
+  line-height: 1.58;
+}
+
+.small-note {
+  margin-top: 18px;
+  font-size: 0.82rem;
+  color: #94a3b8 !important;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 13px 22px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #111827;
+  background: linear-gradient(135deg, #fbbf24, #f97316);
+  cursor: pointer;
+  box-shadow: 0 14px 35px rgba(249, 115, 22, 0.32);
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+.hud {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  width: 318px;
+  max-height: calc(100vh - 28px);
+  overflow: auto;
+  z-index: 22;
+  padding: 10px;
+  border: 1px solid rgba(226, 232, 240, 0.14);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(12px);
+}
+
+.hud-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 8px 10px;
+}
+
+.hud h2 {
+  margin: 3px 0 0;
+  font-size: 1rem;
+  line-height: 1.05;
+}
+
+#hudClose {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 10px;
+  color: #e5e7eb;
+  background: rgba(30, 41, 59, 0.72);
+  box-shadow: none;
+}
+
+.hud-block {
+  padding: 10px;
+  margin-bottom: 8px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.66);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.hud-label {
+  margin-bottom: 6px;
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #93c5fd;
+}
+
+.hud-value {
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
+.hud-note {
+  margin-top: 5px;
+  font-size: 0.76rem;
+  line-height: 1.34;
+  color: #dbeafe;
+  white-space: pre-line;
+}
+
+.progress-line {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.74rem;
+  color: #cbd5e1;
+}
+
+.bar {
+  height: 6px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.22);
+}
+
+.bar-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #22c55e);
+  transition: width 0.18s ease;
+}
+
+.task-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.task-list li {
+  position: relative;
+  padding: 4px 0 4px 22px;
+  font-size: 0.74rem;
+  color: #cbd5e1;
+}
+
+.task-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  border: 1px solid rgba(226, 232, 240, 0.45);
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.task-list li.active {
+  color: #fef3c7;
+  font-weight: 800;
+}
+
+.task-list li.active::before {
+  background: #facc15;
+  border-color: #facc15;
+}
+
+.task-list li.done {
+  color: #bbf7d0;
+}
+
+.task-list li.done::before {
+  background: #22c55e;
+  border-color: #22c55e;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.metrics-grid div {
+  padding: 7px;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.54);
+}
+
+.metrics-grid span {
+  display: block;
+  font-size: 0.64rem;
+  color: #94a3b8;
+}
+
+.metrics-grid strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.88rem;
+  color: #f8fafc;
+}
+
+.hud-message {
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.86);
+  color: #fef3c7;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.interaction-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  z-index: 26;
+  padding: 10px 15px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.86);
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  color: #fef08a;
+  font-weight: 900;
+  font-size: 0.86rem;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+  text-align: center;
+}
+
+.final {
+  z-index: 70;
+  background: rgba(2, 6, 23, 0.78);
+}
+
+.success {
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.hud-toggle {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 28;
+  width: 58px;
+  height: 38px;
+  padding: 0;
+  border-radius: 14px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  backdrop-filter: blur(10px);
+}
+
+.mobile-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.touch-stick {
+  position: absolute;
+  left: 22px;
+  bottom: 28px;
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.48);
+  border: 1px solid rgba(226, 232, 240, 0.28);
+  box-shadow: 0 12px 35px rgba(0,0,0,0.32);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(248, 250, 252, 0.72);
+  border: 2px solid rgba(59, 130, 246, 0.75);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+
+.mobile-actions {
+  position: absolute;
+  right: 18px;
+  bottom: 24px;
+  display: grid;
+  grid-template-columns: 74px 92px;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.mobile-actions button {
+  height: 54px;
+  padding: 0;
+  border-radius: 18px;
+  font-size: 0.76rem;
+  font-weight: 900;
+  color: #0f172a;
+  background: linear-gradient(135deg, #facc15, #f97316);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.34);
+  touch-action: manipulation;
+}
+
+@media (max-width: 900px) {
+  .splash-screen {
+    align-items: flex-end;
+    padding: 16px;
+    background-position: center center;
   }
 
-  createModel() {
-    const body = createBox(2.8, 1.2, 8.6, materials.tamperGreen, 0, 1.22, 0);
-    const lower = createBox(2.38, 0.42, 9.0, materials.darkMetal, 0, 0.55, 0);
-    const stripe = createBox(2.86, 0.18, 7.9, materials.machineYellow, 0, 1.55, 0.2);
-    const cabinA = createBox(2.25, 1.25, 1.45, materials.glassBlue, 0, 2.0, -3.2);
-    const cabinB = createBox(2.08, 1.08, 1.25, materials.glassBlue, 0, 1.95, 3.2);
-    this.group.add(body, lower, stripe, cabinA, cabinB);
-
-    [-3.0, 3.0].forEach((z) => {
-      this.group.add(createBox(1.75, 0.16, 0.25, materials.metal, 0, 0.28, z));
-      [-0.82, 0.82].forEach((x) => {
-        this.group.add(createCylinder(0.29, 0.29, 0.25, 20, materials.darkMetal, x, 0.22, z, { z: Math.PI / 2 }));
-      });
-    });
-
-    this.tampingHead = new THREE.Group();
-    this.tampingHead.position.set(0, 0.85, 0.1);
-    this.group.add(this.tampingHead);
-    this.tampingHead.add(createBox(2.65, 0.25, 1.05, materials.darkMetal, 0, 0.5, 0));
-
-    [-1.02, -0.62, 0.62, 1.02].forEach((x) => {
-      const tine = createBox(0.08, 1.35, 0.10, materials.metal, x, -0.25, 0);
-      this.tampingHead.add(tine);
-      this.tines.push(tine);
-    });
-
-    for (let i = 0; i < 24; i++) {
-      const dust = new THREE.Mesh(
-        new THREE.SphereGeometry(0.045 + Math.random() * 0.035, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0xcbd5e1, transparent: true, opacity: 0 })
-      );
-      dust.position.set((Math.random() - 0.5) * 1.8, 0.25, (Math.random() - 0.5) * 0.9);
-      this.tampingHead.add(dust);
-      this.dustParticles.push(dust);
-    }
+  .splash-panel {
+    padding: 14px;
+    border-radius: 18px;
   }
 
-  setControlled(value) {
-    this.isControlled = value;
-    this.entryZone.setVisible(!value && workPhaseManager && workPhaseManager.phaseIndex === 5);
+  .splash-panel p {
+    font-size: 0.82rem;
   }
 
-  startCycle() {
-    if (this.cycleActive || workPhaseManager.phaseIndex !== 5 || this.tampedCount >= 10) return false;
-    this.cycleActive = true;
-    this.cycleTime = 0;
-    this.speed = 0;
-    playTone(85, 0.25, 'sawtooth');
-    workPhaseManager.setMessage('Ciclo rincalzatura: martelli giù, vibrazione, compattazione e risalita.');
-    return true;
+  .hud {
+    top: 54px;
+    left: 10px;
+    right: auto;
+    width: min(308px, calc(100vw - 20px));
+    max-height: 43vh;
+    padding: 8px;
+    border-radius: 16px;
   }
 
-  updateCycle(delta) {
-    this.cycleTime += delta;
-    const t = this.cycleTime;
-    let headY = 0.85;
-    let vibration = 0;
-    let dustOpacity = 0;
-
-    if (t < 0.8) {
-      headY = 0.85 - (t / 0.8) * 0.58;
-    } else if (t < 2.7) {
-      headY = 0.27;
-      vibration = Math.sin(t * 84) * 0.045;
-      dustOpacity = 0.65;
-      workPhaseManager.metrics.ballastCompaction = Math.min(100, workPhaseManager.metrics.ballastCompaction + delta * 3.5);
-    } else if (t < 3.55) {
-      headY = 0.27 + ((t - 2.7) / 0.85) * 0.58;
-      dustOpacity = 0.24;
-    } else {
-      this.cycleActive = false;
-      this.tampedCount += 1;
-      this.targetIndex = Math.min(tampingMarkers.length - 1, this.targetIndex + 1);
-      workPhaseManager.metrics.tampingProgress = Math.min(100, this.tampedCount * 10);
-      workPhaseManager.metrics.trackGeometryQuality = Math.min(100, 45 + this.tampedCount * 5.4);
-      workPhaseManager.metrics.ballastCompaction = Math.min(100, 45 + this.tampedCount * 4.5);
-      compactBallastAt(this.group.position.z);
-      playTone(150, 0.08, 'triangle');
-
-      if (this.tampedCount < 10) {
-        const nextZ = tampingMarkers[this.targetIndex].position.z;
-        this.autoMoveTarget = new THREE.Vector3(world.workTrackX, 0, nextZ);
-        workPhaseManager.setMessage('Ciclo completato. Avanzamento verso la traversa successiva.');
-      } else {
-        workPhaseManager.completeCurrentPhase();
-      }
-    }
-
-    this.tampingHead.position.y = headY;
-
-    this.tines.forEach((tine, index) => {
-      tine.rotation.z = vibration * (index % 2 === 0 ? 1 : -1);
-    });
-
-    this.dustParticles.forEach((dust, i) => {
-      dust.material.opacity = dustOpacity * (0.35 + (i % 5) * 0.11);
-      dust.position.x += (Math.random() - 0.5) * 0.04;
-      dust.position.y = 0.12 + Math.random() * 0.38;
-      dust.position.z += (Math.random() - 0.5) * 0.035;
-    });
+  .hud.mobile-collapsed {
+    display: none !important;
   }
 
-  update(delta) {
-    this.entryZone.position.copy(this.group.position).add(new THREE.Vector3(2.0, 0, 0));
-    this.entryZone.mesh.position.x = this.entryZone.position.x;
-    this.entryZone.mesh.position.z = this.entryZone.position.z;
-    this.entryZone.arrow.position.x = this.entryZone.position.x;
-    this.entryZone.arrow.position.z = this.entryZone.position.z;
+  .hud-block {
+    padding: 8px;
+    margin-bottom: 6px;
+    border-radius: 12px;
+  }
 
-    if (this.cycleActive) {
-      this.updateCycle(delta);
-      return;
-    }
+  .task-block,
+  .controls-block {
+    display: none;
+  }
 
-    this.tampingHead.position.y = smoothTowards(this.tampingHead.position.y, 0.85, 8, delta);
-    this.dustParticles.forEach((dust) => {
-      dust.material.opacity = smoothTowards(dust.material.opacity, 0, 6, delta);
-    });
+  .hud-note {
+    font-size: 0.72rem;
+  }
 
-    if (this.autoMoveTarget) {
-      const dz = this.autoMoveTarget.z - this.group.position.z;
+  .metrics-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 5px;
+  }
 
-      if (Math.abs(dz) < 0.08) {
-        this.group.position.z = this.autoMoveTarget.z;
-        this.autoMoveTarget = null;
-        workPhaseManager.setMessage('Allineato alla traversa: premi AZIONE per il prossimo ciclo.');
-      } else {
-        this.group.position.z += Math.sign(dz) * Math.min(Math.abs(dz), 2.0 * delta);
-      }
+  .metrics-grid div {
+    padding: 5px;
+  }
 
-      return;
-    }
+  .metrics-grid span {
+    font-size: 0.58rem;
+  }
 
-    if (this.isControlled) {
-      let forwardInput = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
+  .metrics-grid strong {
+    font-size: 0.74rem;
+  }
 
-      if (touchInput.active) {
-        forwardInput = clamp(forwardInput + -touchInput.y, -1, 1);
-      }
+  .hud-message {
+    font-size: 0.72rem;
+    padding: 8px;
+  }
 
-      this.speed = smoothTowards(this.speed, forwardInput * this.maxSpeed, 2.8, delta);
-      this.group.position.z += this.speed * delta;
-      this.group.position.x = world.workTrackX;
-      this.group.position.z = clamp(this.group.position.z, -64, 55);
-    } else {
-      this.speed = smoothTowards(this.speed, 0, 5, delta);
-    }
+  .interaction-hint {
+    bottom: 160px;
+    padding: 9px 13px;
+    font-size: 0.78rem;
+    max-width: 82vw;
+  }
+
+  .menu-card {
+    width: min(92vw, 520px);
+    padding: 22px;
+    border-radius: 20px;
+  }
+
+  .menu-card h1,
+  .menu-card h2 {
+    font-size: clamp(1.75rem, 8vw, 3.2rem);
+    line-height: 1;
   }
 }
 
-class WorkPhaseManager {
-  constructor() {
-    this.phaseIndex = 0;
-    this.phaseProgress = 0;
-    this.message = 'Avvicinati al marker giallo oppure premi E/AZIONE per completare l’ispezione.';
-
-    this.metrics = {
-      railReplacementProgress: 0,
-      fasteningProgress: 0,
-      tampingProgress: 0,
-      trackGeometryQuality: 35,
-      ballastCompaction: 35,
-      safetyScore: 0
-    };
-
-    this.phases = [
-      {
-        name: 'ISPEZIONE INIZIALE',
-        objective: 'Raggiungi il marker giallo oppure premi E/AZIONE per proseguire.',
-        controls: 'Joystick/WASD: movimento · E/AZIONE: conferma ispezione · CAM/C: visuale',
-        onEnter: () => {
-          workObjects.inspectionZone.setVisible(true);
-          this.setMessage('Entra nel grande cerchio giallo oppure premi E/AZIONE. Non puoi più restare bloccato qui.');
-        },
-        update: () => {
-          this.phaseProgress = workObjects.inspectionZone.contains(player.position) ? 100 : 0;
-          if (this.phaseProgress >= 100) this.completeCurrentPhase();
-        }
-      },
-      {
-        name: 'PREPARAZIONE CANTIERE',
-        objective: 'Premi E nel marker blu per attivare sicurezza e luci.',
-        controls: 'Joystick/WASD: movimento · E/AZIONE: conferma punto lavoro',
-        onEnter: () => {
-          workObjects.inspectionZone.setVisible(false);
-          workObjects.prepZone.setVisible(true);
-          this.setMessage('Marker blu allargato: avvicinati e premi E/AZIONE per mettere in sicurezza il cantiere.');
-        },
-        update: () => {
-          this.phaseProgress = this.metrics.safetyScore;
-        }
-      },
-      {
-        name: 'RIMOZIONE ROTAIA',
-        objective: 'Sali sul caricatore strada-rotaia e avvia il sollevamento della rotaia vecchia.',
-        controls: 'E: sali/scendi · Joystick/WASD: guida · AZIONE/Space: rimozione',
-        onEnter: () => {
-          workObjects.prepZone.setVisible(false);
-          workObjects.oldRail.mesh.material.emissive.setHex(0x662200);
-          loader.entryZone.setVisible(activeVehicle !== loader);
-          this.setMessage('Rotaia vecchia evidenziata. Avvicinati al caricatore, premi E, poi AZIONE.');
-        },
-        update: () => {
-          this.phaseProgress = clamp(this.metrics.railReplacementProgress / 55 * 100, 0, 100);
-          loader.entryZone.setVisible(activeVehicle !== loader && this.phaseIndex === 2);
-        }
-      },
-      {
-        name: 'POSA ROTAIA NUOVA',
-        objective: 'Preleva la rotaia nuova dal deposito e posala sulle traverse.',
-        controls: 'Dentro il caricatore: AZIONE/Space avvia posa guidata',
-        onEnter: () => {
-          loader.entryZone.setVisible(activeVehicle !== loader);
-          workObjects.newRail.mesh.material.emissive.setHex(0x164e2b);
-          this.setMessage('Rotaia nuova pronta nel deposito. Resta sul caricatore e premi AZIONE.');
-        },
-        update: () => {
-          this.phaseProgress = clamp((this.metrics.railReplacementProgress - 55) / 45 * 100, 0, 100);
-          loader.entryZone.setVisible(activeVehicle !== loader && this.phaseIndex === 3);
-        }
-      },
-      {
-        name: 'FISSAGGIO ROTAIA',
-        objective: 'Chiudi 6 punti di attacco evidenziati lungo la rotaia.',
-        controls: 'Joystick/WASD: movimento · E/AZIONE: fissa attacco',
-        onEnter: () => {
-          if (activeVehicle) exitVehicle();
-          loader.entryZone.setVisible(false);
-          fasteningPoints.forEach((zone) => zone.setVisible(true));
-          this.setMessage('Fissa la rotaia nuova: ogni marker completato diventa verde.');
-        },
-        update: () => {
-          const completed = fasteningPoints.filter((zone) => zone.completed).length;
-          this.metrics.fasteningProgress = completed / fasteningPoints.length * 100;
-          this.phaseProgress = this.metrics.fasteningProgress;
-          if (completed === fasteningPoints.length) this.completeCurrentPhase();
-        }
-      },
-      {
-        name: 'RINCALZATURA BINARIO',
-        objective: 'Sali sulla rincalzatrice e completa almeno 8-10 cicli sulle traverse.',
-        controls: 'E: sali/scendi · Joystick su/giù: avanza · AZIONE/Space: rincalza',
-        onEnter: () => {
-          fasteningPoints.forEach((zone) => zone.setVisible(false));
-          tamper.entryZone.setVisible(activeVehicle !== tamper);
-          tampingMarkers.forEach((zone, index) => zone.setVisible(index < 10));
-          this.setMessage('Sali sulla rincalzatrice e premi AZIONE sui marker arancioni.');
-        },
-        update: () => {
-          this.phaseProgress = this.metrics.tampingProgress;
-          tamper.entryZone.setVisible(activeVehicle !== tamper && this.phaseIndex === 5);
-
-          tampingMarkers.forEach((zone, index) => {
-            zone.setVisible(index >= tamper.tampedCount && index < 10 && this.phaseIndex === 5);
-            zone.setColor(index === tamper.tampedCount ? 0xf97316 : 0xfacc15);
-          });
-        }
-      },
-      {
-        name: 'CONTROLLO FINALE',
-        objective: 'Verifica rotaia, fissaggio, compattazione, geometria e sicurezza.',
-        controls: 'CAM/C: cambia visuale · MENU/Esc: menu',
-        onEnter: () => {
-          if (activeVehicle) exitVehicle();
-          tamper.entryZone.setVisible(false);
-          tampingMarkers.forEach((zone) => zone.setVisible(false));
-          this.setMessage('Controllo finale: tutti i parametri devono essere sopra soglia.');
-        },
-        update: (delta) => {
-          const m = this.metrics;
-
-          const checks = [
-            m.railReplacementProgress >= 100,
-            m.fasteningProgress >= 100,
-            tamper.tampedCount >= 8,
-            m.trackGeometryQuality >= 85,
-            m.ballastCompaction >= 80,
-            m.safetyScore >= 100
-          ];
-
-          this.phaseProgress = checks.filter(Boolean).length / checks.length * 100;
-
-          if (this.phaseProgress >= 100) {
-            m.trackGeometryQuality = smoothTowards(m.trackGeometryQuality, 92, 1.8, delta);
-            m.ballastCompaction = smoothTowards(m.ballastCompaction, 88, 1.8, delta);
-            showFinalScreen();
-          } else {
-            this.setMessage('Soglie non raggiunte: completa le fasi precedenti.');
-          }
-        }
-      }
-    ];
-
-    this.phases[0].onEnter();
+@media (max-height: 520px) and (orientation: landscape) {
+  .splash-screen {
+    justify-content: flex-start;
+    align-items: flex-end;
+    padding: 12px;
   }
 
-  setMessage(text) {
-    this.message = text;
+  .splash-panel {
+    width: min(420px, 52vw);
+    padding: 12px;
+    text-align: left;
   }
 
-  handleInteract() {
-    const phase = this.phaseIndex;
-
-    if (phase === 0) {
-      this.setMessage('Ispezione completata. Ora prepara il cantiere.');
-      this.completeCurrentPhase();
-      return;
-    }
-
-    if (activeVehicle) {
-      exitVehicle();
-      return;
-    }
-
-    if ((phase === 2 || phase === 3) && loader.entryZone.contains(player.position)) {
-      enterVehicle(loader, 1);
-      return;
-    }
-
-    if (phase === 5 && tamper.entryZone.contains(player.position)) {
-      enterVehicle(tamper, 2);
-      return;
-    }
-
-    if (phase === 1 && workObjects.prepZone.contains(player.position)) {
-      this.metrics.safetyScore = 100;
-
-      constructionLights.forEach((light) => {
-        light.visible = true;
-        if (light.material && light.material.emissive) light.material.emissive.setHex(0xffaa00);
-      });
-
-      setObjectColor(workObjects.barrierGroup, 0xf97316);
-      playTone(320, 0.12, 'triangle');
-      this.completeCurrentPhase();
-      return;
-    }
-
-    if (phase === 4) {
-      const nearest = fasteningPoints.find((zone) => !zone.completed && zone.contains(player.position));
-
-      if (nearest) {
-        nearest.completed = true;
-        nearest.setColor(0x22c55e);
-        nearest.mesh.material.opacity = 0.28;
-        addFasteningPlate(nearest.position);
-        playTone(240, 0.07, 'square');
-        this.setMessage('Attacco chiuso. Passa al prossimo punto evidenziato.');
-      }
-    }
+  .splash-panel h1 {
+    font-size: clamp(1.8rem, 5vw, 3.2rem);
   }
 
-  handleAction() {
-    if (this.phaseIndex === 0) {
-      this.handleInteract();
-      return;
-    }
-
-    if (this.phaseIndex === 1 || this.phaseIndex === 4) {
-      this.handleInteract();
-      return;
-    }
-
-    if (this.phaseIndex === 2) {
-      if (activeVehicle === loader) {
-        if (!loader.sequence) loader.startRemoveSequence(workObjects.oldRail);
-      } else {
-        this.setMessage('Devi prima salire sul caricatore: premi E vicino al mezzo.');
-      }
-      return;
-    }
-
-    if (this.phaseIndex === 3) {
-      if (activeVehicle === loader) {
-        if (!loader.sequence) loader.startPlaceSequence(workObjects.newRail);
-      } else {
-        this.setMessage('Devi prima salire sul caricatore per posare la rotaia.');
-      }
-      return;
-    }
-
-    if (this.phaseIndex === 5) {
-      if (activeVehicle === tamper) tamper.startCycle();
-      else this.setMessage('Devi prima salire sulla rincalzatrice: premi E vicino al mezzo.');
-    }
+  .splash-panel p {
+    font-size: 0.74rem;
+    margin-left: 0;
   }
 
-  completeCurrentPhase() {
-    if (this.phaseIndex >= this.phases.length - 1) return;
-    this.phaseProgress = 100;
-    this.phaseIndex += 1;
-    this.phaseProgress = 0;
-    this.phases[this.phaseIndex].onEnter();
+  .hud {
+    top: 52px;
+    left: 10px;
+    width: 260px;
+    max-height: 58vh;
   }
 
-  update(delta) {
-    this.phases[this.phaseIndex].update(delta);
+  .hud-block:nth-child(2) .hud-note {
+    display: none;
   }
 
-  getCurrentPhase() {
-    return this.phases[this.phaseIndex];
-  }
-}
-
-function init() {
-  isMobileDevice = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 900;
-  cacheDom();
-  clock = new THREE.Clock();
-  createScene();
-  bindEvents();
-  animate();
-}
-
-function cacheDom() {
-  dom.splashScreen = document.getElementById('splashScreen');
-  dom.splashEnterButton = document.getElementById('splashEnterButton');
-  dom.menuScreen = document.getElementById('menuScreen');
-  dom.playButton = document.getElementById('playButton');
-  dom.restartButton = document.getElementById('restartButton');
-  dom.hud = document.getElementById('hud');
-  dom.hudClose = document.getElementById('hudClose');
-  dom.finalScreen = document.getElementById('finalScreen');
-  dom.phaseName = document.getElementById('phaseName');
-  dom.phaseObjective = document.getElementById('phaseObjective');
-  dom.phaseProgressText = document.getElementById('phaseProgressText');
-  dom.phaseProgressBar = document.getElementById('phaseProgressBar');
-  dom.railProgressText = document.getElementById('railProgressText');
-  dom.fasteningProgressText = document.getElementById('fasteningProgressText');
-  dom.tampingProgressText = document.getElementById('tampingProgressText');
-  dom.qualityText = document.getElementById('qualityText');
-  dom.compactionText = document.getElementById('compactionText');
-  dom.safetyText = document.getElementById('safetyText');
-  dom.controlsText = document.getElementById('controlsText');
-  dom.messageText = document.getElementById('messageText');
-  dom.taskList = document.getElementById('taskList');
-  dom.interactionHint = document.getElementById('interactionHint');
-  dom.mobileControls = document.getElementById('mobileControls');
-  dom.touchStick = document.getElementById('touchStick');
-  dom.touchKnob = document.getElementById('touchKnob');
-  dom.mobileInteract = document.getElementById('mobileInteract');
-  dom.mobileAction = document.getElementById('mobileAction');
-  dom.mobileCamera = document.getElementById('mobileCamera');
-  dom.mobileMenu = document.getElementById('mobileMenu');
-  dom.hudToggle = document.getElementById('hudToggle');
-}
-
-function createScene() {
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xbfd7ee);
-  scene.fog = new THREE.Fog(0xbfd7ee, 95, 330);
-
-  camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 600);
-  camera.position.set(18, 18, 34);
-
-  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobileDevice ? 1.45 : 1.75));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = !isMobileDevice;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  document.getElementById('gameRoot').appendChild(renderer.domElement);
-
-  createMaterials();
-  createLights();
-  createTerrain();
-  createRailYard();
-  createDepotArea();
-  createRailwayBuildings();
-  createVegetation();
-  createWorkers();
-  createPlayer();
-  createRailRoadLoader();
-  createTampingMachine();
-  createInteractionAndWorkZones();
-
-  workPhaseManager = new WorkPhaseManager();
-}
-
-function createMaterials() {
-  materials.ground = new THREE.MeshLambertMaterial({ color: 0x6f7d4e });
-  materials.grass = new THREE.MeshLambertMaterial({ color: 0x4d7c3f });
-  materials.dirt = new THREE.MeshLambertMaterial({ color: 0x8a7356 });
-  materials.depotGround = new THREE.MeshLambertMaterial({ color: 0x8b8f8f });
-  materials.ballast = new THREE.MeshLambertMaterial({ color: 0x7f8790 });
-  materials.ballastDark = new THREE.MeshLambertMaterial({ color: 0x505a63 });
-  materials.ballastLight = new THREE.MeshLambertMaterial({ color: 0xb6bec8 });
-  materials.rail = new THREE.MeshStandardMaterial({ color: 0x463329, roughness: 0.38, metalness: 0.72 });
-  materials.railSide = new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.35, metalness: 0.78 });
-  materials.railOld = new THREE.MeshStandardMaterial({ color: 0x5b3425, roughness: 0.72, metalness: 0.42, emissive: 0x000000 });
-  materials.railNew = new THREE.MeshStandardMaterial({ color: 0xa9b2bd, roughness: 0.22, metalness: 0.86, emissive: 0x000000 });
-  materials.sleeper = new THREE.MeshLambertMaterial({ color: 0x7b5130 });
-  materials.sleeperConcrete = new THREE.MeshLambertMaterial({ color: 0xb7b7b1 });
-  materials.metal = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.38, metalness: 0.72 });
-  materials.darkMetal = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.48, metalness: 0.58 });
-  materials.railWheel = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.35, metalness: 0.85 });
-  materials.tire = new THREE.MeshLambertMaterial({ color: 0x0f172a });
-  materials.loaderYellow = new THREE.MeshLambertMaterial({ color: 0xf2c230 });
-  materials.machineYellow = new THREE.MeshLambertMaterial({ color: 0xfacc15 });
-  materials.tamperGreen = new THREE.MeshLambertMaterial({ color: 0x2f8a4d });
-  materials.glassBlue = new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.68 });
-  materials.cabinFrame = new THREE.MeshLambertMaterial({ color: 0x334155, transparent: true, opacity: 0.35 });
-  materials.lightAmber = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0x331800, roughness: 0.25 });
-  materials.cone = new THREE.MeshLambertMaterial({ color: 0xf97316 });
-  materials.white = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
-  materials.green = new THREE.MeshLambertMaterial({ color: 0x22c55e });
-  materials.red = new THREE.MeshLambertMaterial({ color: 0xef4444 });
-  materials.brick = new THREE.MeshLambertMaterial({ color: 0x9b4d32 });
-  materials.roof = new THREE.MeshLambertMaterial({ color: 0x7c2d12 });
-  materials.woodStack = new THREE.MeshLambertMaterial({ color: 0x5c3b24 });
-  materials.workerOrange = new THREE.MeshLambertMaterial({ color: 0xf97316 });
-}
-
-function createLights() {
-  scene.add(new THREE.HemisphereLight(0xdbeafe, 0x6b4f30, 0.82));
-
-  const sun = new THREE.DirectionalLight(0xffffff, 0.95);
-  sun.position.set(-38, 48, 26);
-  sun.castShadow = !isMobileDevice;
-  sun.shadow.camera.left = -80;
-  sun.shadow.camera.right = 80;
-  sun.shadow.camera.top = 95;
-  sun.shadow.camera.bottom = -95;
-  sun.shadow.mapSize.width = 2048;
-  sun.shadow.mapSize.height = 2048;
-  scene.add(sun);
-}
-
-function createTerrain() {
-  const geometry = new THREE.PlaneGeometry(120, 300, 34, 80);
-  geometry.rotateX(-Math.PI / 2);
-
-  const pos = geometry.attributes.position;
-
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    let y = Math.sin(z * 0.025) * 0.55 + Math.cos(x * 0.09) * 0.35;
-
-    if (Math.abs(x) < 17) y *= 0.16;
-    if (x > 7 && x < 29 && z > -70 && z < 72) y = 0.02;
-
-    pos.setY(i, y);
+  .metrics-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
-  geometry.computeVertexNormals();
-
-  const ground = new THREE.Mesh(geometry, materials.ground);
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  scene.add(createBox(16, 0.04, 246, materials.dirt, 0, 0.045, 0));
-  scene.add(createBox(25, 0.06, 140, materials.depotGround, world.depotX + 5, 0.07, 0));
-  scene.add(createBox(7, 0.04, 220, materials.dirt, -19.5, 0.075, 0));
-}
-
-function createRailYard() {
-  [-world.trackSpacing, 0, world.trackSpacing].forEach((x, index) => createTrack(index, x));
-}
-
-function createTrack(index, xPosition) {
-  const group = new THREE.Group();
-  group.name = 'Track-' + index;
-  scene.add(group);
-
-  createBallastBed(group, xPosition, index);
-  createSleepers(group, xPosition, index);
-  createRails(group, xPosition, index);
-
-  if (index === 2) createSimpleSwitch(group, xPosition);
-}
-
-function createBallastBed(group, xPosition, index) {
-  const bedWidth = index === 1 ? 4.8 : 4.2;
-
-  group.add(createBox(bedWidth, 0.3, world.trackLength, materials.ballastDark, xPosition, 0.18, 0));
-
-  const leftShoulder = createBox(1.0, 0.58, world.trackLength, materials.ballast, xPosition - bedWidth / 2 - 0.45, 0.3, 0);
-  const rightShoulder = createBox(1.0, 0.58, world.trackLength, materials.ballast, xPosition + bedWidth / 2 + 0.45, 0.3, 0);
-
-  leftShoulder.rotation.z = -0.09;
-  rightShoulder.rotation.z = 0.09;
-
-  group.add(leftShoulder, rightShoulder);
-
-  const stoneCount = isMobileDevice ? 170 : 360;
-  const mesh = new THREE.InstancedMesh(
-    new THREE.DodecahedronGeometry(0.075, 0),
-    index % 2 ? materials.ballastLight : materials.ballast,
-    stoneCount
-  );
-
-  const dummy = new THREE.Object3D();
-
-  for (let i = 0; i < stoneCount; i++) {
-    const sideBias = Math.random() < 0.42
-      ? (Math.random() < 0.5 ? -1 : 1) * (1.45 + Math.random() * 1.55)
-      : (Math.random() - 0.5) * 2.65;
-
-    dummy.position.set(
-      xPosition + sideBias,
-      0.42 + Math.random() * 0.28,
-      -world.trackLength / 2 + Math.random() * world.trackLength
-    );
-
-    dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-
-    const s = 0.75 + Math.random() * 1.8;
-    dummy.scale.set(s, 0.55 + Math.random() * 0.75, s);
-    dummy.updateMatrix();
-    mesh.setMatrixAt(i, dummy.matrix);
+  .touch-stick {
+    width: 104px;
+    height: 104px;
+    left: 20px;
+    bottom: 18px;
   }
 
-  group.add(mesh);
-}
-
-function createSleepers(group, xPosition, index) {
-  const count = Math.floor(world.trackLength / world.sleeperSpacing);
-
-  for (let i = 0; i < count; i++) {
-    const z = -world.trackLength / 2 + i * world.sleeperSpacing;
-    const material = index === 1 && i % 3 === 0 ? materials.sleeperConcrete : materials.sleeper;
-    const sleeper = createBox(3.05, 0.22, 0.34, material, xPosition, 0.43, z);
-    sleeper.rotation.y = (Math.random() - 0.5) * 0.018;
-    group.add(sleeper);
-  }
-}
-
-function createRails(group, xPosition, index) {
-  const leftX = xPosition - world.railGauge / 2;
-  const rightX = xPosition + world.railGauge / 2;
-
-  if (index === 1) {
-    group.add(createBox(0.16, 0.19, world.trackLength, materials.railSide, leftX, 0.58, 0));
-    group.add(createBox(0.28, 0.07, world.trackLength, materials.railSide, leftX, 0.72, 0));
-    workObjects.oldRail = new RailSegment('old-work-rail', new THREE.Vector3(rightX, 0.58, -17), 78, materials.railOld);
-  } else {
-    [leftX, rightX].forEach((x) => {
-      group.add(createBox(0.16, 0.19, world.trackLength, materials.rail, x, 0.58, 0));
-      group.add(createBox(0.28, 0.07, world.trackLength, materials.railSide, x, 0.72, 0));
-    });
-  }
-}
-
-function createSimpleSwitch(group, xPosition) {
-  const switchGroup = new THREE.Group();
-  switchGroup.position.set(xPosition, 0.75, 38);
-
-  const divergingA = createBox(0.12, 0.08, 34, materials.rail, 0.7, 0, 0);
-  const divergingB = createBox(0.12, 0.08, 34, materials.rail, 1.55, 0, 0);
-  divergingA.rotation.y = -0.15;
-  divergingB.rotation.y = -0.15;
-
-  const bladeA = createBox(0.10, 0.08, 11, materials.railNew, -0.2, 0.02, -8);
-  const bladeB = createBox(0.10, 0.08, 11, materials.railNew, 0.4, 0.02, -8);
-  bladeA.rotation.y = -0.07;
-  bladeB.rotation.y = -0.05;
-
-  switchGroup.add(divergingA, divergingB, bladeA, bladeB);
-  group.add(switchGroup);
-}
-
-function createDepotArea() {
-  const depot = new THREE.Group();
-  depot.name = 'DepotArea';
-  scene.add(depot);
-
-  for (let i = 0; i < 7; i++) {
-    const rail = createBox(
-      0.15,
-      0.16,
-      42,
-      i < 2 ? materials.railNew : materials.rail,
-      world.depotX + 1.2 + i * 0.35,
-      0.45 + i * 0.08,
-      -48
-    );
-    rail.rotation.y = 0.02;
-    depot.add(rail);
+  .touch-knob {
+    width: 48px;
+    height: 48px;
   }
 
-  workObjects.newRail = new RailSegment('new-work-rail', new THREE.Vector3(world.depotX + 1.4, 0.94, -48), 78, materials.railNew);
-  workObjects.newRail.mesh.rotation.y = 0.02;
-
-  for (let stack = 0; stack < 4; stack++) {
-    for (let i = 0; i < 10; i++) {
-      const sleeper = createBox(
-        3.1,
-        0.18,
-        0.32,
-        stack % 2 ? materials.sleeper : materials.sleeperConcrete,
-        world.depotX + 7 + stack * 3.4,
-        0.22 + i * 0.18,
-        -14 + (i % 2) * 0.08
-      );
-      sleeper.rotation.y = Math.PI / 2;
-      depot.add(sleeper);
-    }
+  .mobile-actions {
+    right: 16px;
+    bottom: 16px;
+    grid-template-columns: 66px 84px;
+    gap: 8px;
   }
 
-  for (let row = 0; row < 3; row++) {
-    for (let i = 0; i < 12; i++) {
-      const rail = createBox(
-        0.13,
-        0.15,
-        24,
-        materials.railOld,
-        world.depotX + 1.4 + row * 0.55,
-        0.45 + i * 0.05,
-        30 + row * 3.2
-      );
-      rail.rotation.y = Math.PI / 2;
-      depot.add(rail);
-    }
+  .mobile-actions button {
+    height: 48px;
+    border-radius: 15px;
+    font-size: 0.68rem;
   }
 
-  const barrierGroup = new THREE.Group();
-  workObjects.barrierGroup = barrierGroup;
-  scene.add(barrierGroup);
-
-  for (let i = 0; i < 14; i++) {
-    const z = -42 + i * 6.2;
-    const side = i % 2 === 0 ? -1 : 1;
-    barrierGroup.add(createConeBarrier(side * 3.9, z));
-  }
-
-  for (let i = 0; i < 5; i++) {
-    const tower = new THREE.Group();
-    tower.position.set(4.7, 0, -48 + i * 24);
-    tower.add(createCylinder(0.07, 0.07, 2.4, 8, materials.darkMetal, 0, 1.2, 0));
-
-    const lamp = createBox(0.55, 0.35, 0.18, materials.lightAmber, 0.1, 2.48, 0);
-    lamp.visible = false;
-    tower.add(lamp);
-
-    constructionLights.push(lamp);
-    scene.add(tower);
-  }
-
-  for (let i = 0; i < 5; i++) {
-    depot.add(createBox(1.3, 0.18, 1.0, materials.woodStack, world.depotX + 9 + i * 2.1, 0.2, 36));
-  }
-
-  colliders.push({ center: new THREE.Vector3(world.depotX + 8, 0, -14), radius: 6.6, owner: depot });
-}
-
-function createConeBarrier(x, z) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.add(createCylinder(0.05, 0.32, 0.78, 16, materials.cone, 0, 0.39, 0));
-  group.add(createCylinder(0.052, 0.23, 0.08, 16, materials.white, 0, 0.52, 0));
-  return group;
-}
-
-function createRailwayBuildings() {
-  createBuilding(-18, -62, 7.5, 4.5, 9, 'station');
-  createBuilding(21, -64, 10, 4.0, 7, 'warehouse');
-  createBuilding(25, 14, 6, 3.2, 5, 'technical');
-
-  scene.add(createBox(3.2, 0.22, 70, materials.depotGround, -8.6, 0.33, -46));
-
-  for (let i = 0; i < 8; i++) {
-    const z = -78 + i * 9;
-    scene.add(createCylinder(0.055, 0.055, 2.4, 8, materials.darkMetal, -9.7, 1.2, z));
-    scene.add(createCylinder(0.16, 0.16, 0.1, 16, materials.lightAmber, -9.7, 2.45, z, { z: Math.PI / 2 }));
+  .interaction-hint {
+    bottom: 132px;
   }
 }
-
-function createBuilding(x, z, w, h, d, type) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-
-  const body = createBox(w, h, d, type === 'warehouse' ? materials.depotGround : materials.brick, 0, h / 2, 0);
-  const roof = createBox(w + 0.7, 0.6, d + 0.7, materials.roof, 0, h + 0.32, 0);
-  roof.rotation.z = 0.02;
-
-  const door = createBox(1.1, 1.7, 0.08, materials.darkMetal, 0, 0.9, d / 2 + 0.05);
-  const winA = createBox(0.8, 0.65, 0.08, materials.glassBlue, -w * 0.28, h * 0.58, d / 2 + 0.06);
-  const winB = createBox(0.8, 0.65, 0.08, materials.glassBlue, w * 0.28, h * 0.58, d / 2 + 0.06);
-
-  group.add(body, roof, door, winA, winB);
-  scene.add(group);
-
-  colliders.push({ center: new THREE.Vector3(x, 0, z), radius: Math.max(w, d) * 0.55, owner: group });
-}
-
-function createVegetation() {
-  const grassCount = isMobileDevice ? 180 : 420;
-  const grassMesh = new THREE.InstancedMesh(new THREE.ConeGeometry(0.05, 0.65, 5), materials.grass, grassCount);
-  const dummy = new THREE.Object3D();
-
-  for (let i = 0; i < grassCount; i++) {
-    let x = (Math.random() - 0.5) * 105;
-
-    if (Math.abs(x) < 15) x += x < 0 ? -16 : 16;
-
-    const z = -135 + Math.random() * 270;
-    dummy.position.set(x, 0.36, z);
-    dummy.rotation.y = Math.random() * Math.PI;
-
-    const s = 0.6 + Math.random() * 1.6;
-    dummy.scale.set(s, s, s);
-    dummy.updateMatrix();
-    grassMesh.setMatrixAt(i, dummy.matrix);
-  }
-
-  scene.add(grassMesh);
-
-  const treeCount = isMobileDevice ? 28 : 55;
-
-  for (let i = 0; i < treeCount; i++) {
-    const x = (Math.random() < 0.5 ? -1 : 1) * (25 + Math.random() * 30);
-    const z = -125 + Math.random() * 250;
-    createTree(x, z, 0.8 + Math.random() * 1.5);
-  }
-}
-
-function createTree(x, z, s) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-
-  const trunk = createCylinder(0.16 * s, 0.22 * s, 2.4 * s, 8, materials.woodStack, 0, 1.2 * s, 0);
-  const crown1 = createSphere(1.15 * s, materials.grass, 0, 2.7 * s, 0, { x: 1.1, y: 1, z: 1.1 });
-  const crown2 = createSphere(0.85 * s, materials.grass, -0.55 * s, 2.35 * s, 0.25 * s, { x: 1, y: 0.9, z: 1 });
-  const crown3 = createSphere(0.8 * s, materials.grass, 0.58 * s, 2.45 * s, -0.2 * s, { x: 1, y: 0.9, z: 1 });
-
-  group.add(trunk, crown1, crown2, crown3);
-  scene.add(group);
-}
-
-function createWorkers() {
-  createWorker(world.depotX + 8, -34, Math.PI * 0.6);
-  createWorker(6.2, -8, -Math.PI * 0.2);
-  createWorker(world.depotX + 13, 20, Math.PI * 0.9);
-}
-
-function createWorker(x, z, rot) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.rotation.y = rot;
-
-  group.add(createBox(0.34, 0.75, 0.22, materials.darkMetal, 0, 0.45, 0));
-  group.add(createBox(0.55, 0.82, 0.28, materials.workerOrange, 0, 1.15, 0));
-  group.add(createSphere(0.18, new THREE.MeshLambertMaterial({ color: 0xffc08a }), 0, 1.7, 0));
-  group.add(createSphere(0.2, materials.machineYellow, 0, 1.84, 0, { x: 1.1, y: 0.45, z: 1.1 }));
-
-  scene.add(group);
-}
-
-function createRailRoadLoader() {
-  loader = new RailRoadLoader(new THREE.Vector3(4.2, 0, 8));
-}
-
-function createTampingMachine() {
-  tamper = new TampingMachine(new THREE.Vector3(world.workTrackX, 0, -58));
-}
-
-function createPlayer() {
-  const group = new THREE.Group();
-  group.position.set(0, 0, -36);
-
-  const body = createCylinder(0.28, 0.33, 1.1, 18, new THREE.MeshLambertMaterial({ color: 0x2563eb }), 0, 1.0, 0);
-  const vest = createBox(0.5, 0.45, 0.08, materials.workerOrange, 0, 1.16, -0.25);
-
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.24, 18, 18),
-    new THREE.MeshLambertMaterial({ color: 0xffd3a3 })
-  );
-  head.position.set(0, 1.7, 0);
-  head.castShadow = true;
-
-  const helmet = new THREE.Mesh(
-    new THREE.SphereGeometry(0.27, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2),
-    materials.machineYellow
-  );
-  helmet.position.set(0, 1.8, 0);
-  helmet.castShadow = true;
-
-  group.add(body, vest, head, helmet);
-  scene.add(group);
-
-  player = {
-    group,
-    position: group.position,
-    velocity: new THREE.Vector3(),
-    baseSpeed: 7.0 * 1.4,
-    sprintMultiplier: 1.22,
-    acceleration: 10.5,
-    deceleration: 13.5,
-    radius: 0.55,
-    walkBob: 0
-  };
-
-  lastSafePlayerPosition.copy(player.position);
-}
-
-function createInteractionAndWorkZones() {
-  workObjects.inspectionZone = new InteractionZone('inspection', new THREE.Vector3(0, 0, -30), 10.0, 0xfacc15, false);
-  interactionZones.push(workObjects.inspectionZone);
-
-  workObjects.prepZone = new InteractionZone('prep', new THREE.Vector3(-3.6, 0, -30), 6.5, 0x38bdf8, false);
-  interactionZones.push(workObjects.prepZone);
-
-  [-50, -36, -22, -8, 6, 20].forEach((z, index) => {
-    const zone = new InteractionZone('fastening-' + index, new THREE.Vector3(world.workRailSideX, 0, z), 1.55, 0xfacc15, false);
-    fasteningPoints.push(zone);
-    interactionZones.push(zone);
-  });
-
-  for (let i = 0; i < 10; i++) {
-    const z = -48 + i * 5.0;
-    const zone = new InteractionZone('tamping-' + i, new THREE.Vector3(world.workTrackX, 0, z), 1.75, 0xf97316, false);
-    tampingMarkers.push(zone);
-    interactionZones.push(zone);
-  }
-}
-
-function addFasteningPlate(position) {
-  scene.add(createBox(0.54, 0.06, 0.42, materials.green, position.x, 0.78, position.z));
-  scene.add(createCylinder(0.055, 0.055, 0.08, 12, materials.darkMetal, position.x - 0.17, 0.86, position.z, null));
-  scene.add(createCylinder(0.055, 0.055, 0.08, 12, materials.darkMetal, position.x + 0.17, 0.86, position.z, null));
-}
-
-function compactBallastAt(z) {
-  const patch = createBox(3.55, 0.035, 1.28, materials.ballastLight, world.workTrackX, 0.82, z);
-  patch.material = patch.material.clone();
-  patch.material.transparent = true;
-  patch.material.opacity = 0.38;
-  scene.add(patch);
-}
-
-function bindEvents() {
-  window.addEventListener('resize', onWindowResize);
-  window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('keyup', onKeyUp);
-  window.addEventListener('contextmenu', function (event) { event.preventDefault(); });
-
-  dom.splashEnterButton.addEventListener('click', showMainMenu);
-  dom.playButton.addEventListener('click', startGame);
-  dom.restartButton.addEventListener('click', restartGame);
-
-  dom.hudToggle.addEventListener('click', function () {
-    dom.hud.classList.toggle('mobile-collapsed');
-  });
-
-  dom.hudClose.addEventListener('click', function () {
-    dom.hud.classList.add('mobile-collapsed');
-  });
-
-  setupMobileControls();
-}
-
-function setupMobileControls() {
-  const maxDistance = 42;
-
-  function resetStick() {
-    touchInput.active = false;
-    touchInput.pointerId = null;
-    touchInput.x = 0;
-    touchInput.y = 0;
-    dom.touchKnob.style.transform = 'translate(-50%, -50%)';
-  }
-
-  dom.touchStick.addEventListener('pointerdown', function (event) {
-    event.preventDefault();
-    touchInput.active = true;
-    touchInput.pointerId = event.pointerId;
-    touchInput.startX = event.clientX;
-    touchInput.startY = event.clientY;
-    dom.touchStick.setPointerCapture(event.pointerId);
-  });
-
-  dom.touchStick.addEventListener('pointermove', function (event) {
-    if (!touchInput.active || event.pointerId !== touchInput.pointerId) return;
-
-    const dx = event.clientX - touchInput.startX;
-    const dy = event.clientY - touchInput.startY;
-    const distance = Math.min(maxDistance, Math.sqrt(dx * dx + dy * dy));
-    const angle = Math.atan2(dy, dx);
-
-    const knobX = Math.cos(angle) * distance;
-    const knobY = Math.sin(angle) * distance;
-
-    touchInput.x = knobX / maxDistance;
-    touchInput.y = knobY / maxDistance;
-
-    dom.touchKnob.style.transform =
-      'translate(calc(-50% + ' + knobX + 'px), calc(-50% + ' + knobY + 'px))';
-  });
-
-  dom.touchStick.addEventListener('pointerup', resetStick);
-  dom.touchStick.addEventListener('pointercancel', resetStick);
-  dom.touchStick.addEventListener('lostpointercapture', resetStick);
-
-  dom.mobileInteract.addEventListener('click', function () {
-    if (gameStarted) workPhaseManager.handleInteract();
-  });
-
-  dom.mobileAction.addEventListener('click', function () {
-    if (gameStarted) workPhaseManager.handleAction();
-  });
-
-  dom.mobileCamera.addEventListener('click', function () {
-    if (gameStarted) cameraMode = (cameraMode + 1) % 4;
-  });
-
-  dom.mobileMenu.addEventListener('click', function () {
-    if (!gameStarted) return;
-
-    if (activeVehicle) exitVehicle();
-    else dom.menuScreen.classList.toggle('hidden');
-  });
-}
-
-function showMainMenu() {
-  dom.splashScreen.classList.add('hidden');
-  dom.menuScreen.classList.remove('hidden');
-  ensureAudio();
-}
-
-function startGame() {
-  gameStarted = true;
-
-  dom.menuScreen.classList.add('hidden');
-  dom.hud.classList.remove('hidden');
-
-  if (isMobileDevice) {
-    dom.mobileControls.classList.remove('hidden');
-    dom.hudToggle.classList.remove('hidden');
-    dom.hud.classList.add('mobile-collapsed');
-  }
-
-  ensureAudio();
-}
-
-function restartGame() {
-  window.location.reload();
-}
-
-function showFinalScreen() {
-  if (!dom.finalScreen.classList.contains('hidden')) return;
-
-  dom.finalScreen.classList.remove('hidden');
-
-  playTone(440, 0.12, 'triangle');
-  setTimeout(() => playTone(660, 0.12, 'triangle'), 120);
-}
-
-function onWindowResize() {
-  isMobileDevice = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 900;
-
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobileDevice ? 1.45 : 1.75));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-
-  if (gameStarted && isMobileDevice) {
-    dom.mobileControls.classList.remove('hidden');
-    dom.hudToggle.classList.remove('hidden');
-  }
-}
-
-function onKeyDown(event) {
-  keys[event.code] = true;
-
-  if (!gameStarted) return;
-
-  if (event.code === 'KeyE') {
-    event.preventDefault();
-    workPhaseManager.handleInteract();
-  }
-
-  if (event.code === 'Space') {
-    event.preventDefault();
-    workPhaseManager.handleAction();
-  }
-
-  if (event.code === 'KeyC') {
-    cameraMode = (cameraMode + 1) % 4;
-  }
-
-  if (event.code === 'Escape') {
-    if (activeVehicle) exitVehicle();
-    else dom.menuScreen.classList.toggle('hidden');
-  }
-}
-
-function onKeyUp(event) {
-  keys[event.code] = false;
-}
-
-function enterVehicle(vehicle, desiredCameraMode) {
-  activeVehicle = vehicle;
-
-  if (vehicle === loader) loader.setControlled(true);
-  if (vehicle === tamper) tamper.setControlled(true);
-
-  player.group.visible = false;
-  cameraMode = desiredCameraMode;
-
-  workPhaseManager.setMessage(
-    vehicle === loader
-      ? 'Sei sul caricatore. Premi AZIONE per avviare la lavorazione guidata.'
-      : 'Sei sulla rincalzatrice. Premi AZIONE sul marker arancione.'
-  );
-}
-
-function exitVehicle() {
-  if (!activeVehicle) return;
-
-  player.position.copy(activeVehicle.group.position.clone().add(new THREE.Vector3(2.1, 0, 0)));
-  player.group.visible = true;
-
-  if (activeVehicle === loader) loader.setControlled(false);
-  if (activeVehicle === tamper) tamper.setControlled(false);
-
-  activeVehicle = null;
-  cameraMode = 0;
-}
-
-function updatePlayer(delta) {
-  if (!gameStarted || activeVehicle) return;
-
-  const input = new THREE.Vector3();
-
-  if (keys.KeyW || keys.ArrowUp) input.z -= 1;
-  if (keys.KeyS || keys.ArrowDown) input.z += 1;
-  if (keys.KeyA || keys.ArrowLeft) input.x -= 1;
-  if (keys.KeyD || keys.ArrowRight) input.x += 1;
-
-  if (touchInput.active) {
-    input.x += touchInput.x;
-    input.z += touchInput.y;
-  }
-
-  if (input.lengthSq() > 0) input.normalize();
-
-  const speed = player.baseSpeed * (keys.ShiftLeft || keys.ShiftRight ? player.sprintMultiplier : 1);
-  const targetVelocity = input.multiplyScalar(speed);
-  const rate = targetVelocity.lengthSq() > 0 ? player.acceleration : player.deceleration;
-
-  player.velocity.x = smoothTowards(player.velocity.x, targetVelocity.x, rate, delta);
-  player.velocity.z = smoothTowards(player.velocity.z, targetVelocity.z, rate, delta);
-
-  lastSafePlayerPosition.copy(player.position);
-  player.position.addScaledVector(player.velocity, delta);
-
-  player.position.x = clamp(player.position.x, -28, 30);
-  player.position.z = clamp(player.position.z, -118, 118);
-
-  if (collidesWithMainObjects(player.position)) {
-    player.position.copy(lastSafePlayerPosition);
-    player.velocity.multiplyScalar(0.12);
-  }
-
-  if (player.velocity.lengthSq() > 0.04) {
-    player.group.rotation.y = Math.atan2(player.velocity.x, player.velocity.z);
-    player.walkBob += delta * player.velocity.length() * 2.4;
-    player.group.children[0].scale.y = 1 + Math.sin(player.walkBob) * 0.018;
-  }
-}
-
-function collidesWithMainObjects(pos) {
-  for (let i = 0; i < colliders.length; i++) {
-    const c = colliders[i];
-
-    if (activeVehicle && c.owner === activeVehicle) continue;
-
-    if (distanceXZ(pos, c.center) < c.radius + player.radius) return true;
-  }
-
-  return false;
-}
-
-function updateVehicles(delta) {
-  loader.update(delta);
-  tamper.update(delta);
-}
-
-function updateWorkPhases(delta) {
-  if (gameStarted) workPhaseManager.update(delta);
-}
-
-function updateInteractionHints(delta) {
-  let hint = '';
-
-  if (!gameStarted || !workPhaseManager) {
-    dom.interactionHint.classList.add('hidden');
-    return;
-  }
-
-  interactionZones.forEach((zone) => zone.update(delta));
-
-  if (workPhaseManager.phaseIndex === 0) {
-    hint = 'Premi E/AZIONE per completare ispezione';
-  } else if (activeVehicle) {
-    hint = 'Premi E per scendere dal mezzo';
-  } else if ((workPhaseManager.phaseIndex === 2 || workPhaseManager.phaseIndex === 3) && loader.entryZone.contains(player.position)) {
-    hint = 'Premi E per salire sul caricatore';
-  } else if (workPhaseManager.phaseIndex === 5 && tamper.entryZone.contains(player.position)) {
-    hint = 'Premi E per salire sulla rincalzatrice';
-  } else if (workPhaseManager.phaseIndex === 1 && workObjects.prepZone.contains(player.position)) {
-    hint = 'Premi E/AZIONE per attivare il cantiere';
-  } else if (workPhaseManager.phaseIndex === 4) {
-    const point = fasteningPoints.find((zone) => !zone.completed && zone.contains(player.position));
-    if (point) hint = 'Premi E/AZIONE per fissare attacco rotaia';
-  }
-
-  if (hint) {
-    dom.interactionHint.textContent = hint;
-    dom.interactionHint.classList.remove('hidden');
-  } else {
-    dom.interactionHint.classList.add('hidden');
-  }
-}
-
-function updateHUD() {
-  if (!workPhaseManager || !gameStarted) return;
-
-  const phase = workPhaseManager.getCurrentPhase();
-  const m = workPhaseManager.metrics;
-
-  dom.phaseName.textContent = phase.name;
-  dom.phaseObjective.textContent = phase.objective;
-  dom.phaseProgressText.textContent = percent(workPhaseManager.phaseProgress);
-  dom.phaseProgressBar.style.width = percent(workPhaseManager.phaseProgress);
-
-  dom.railProgressText.textContent = percent(m.railReplacementProgress);
-  dom.fasteningProgressText.textContent = percent(m.fasteningProgress);
-  dom.tampingProgressText.textContent = percent(m.tampingProgress);
-  dom.qualityText.textContent = percent(m.trackGeometryQuality);
-  dom.compactionText.textContent = percent(m.ballastCompaction);
-  dom.safetyText.textContent = percent(m.safetyScore);
-
-  dom.controlsText.textContent = phase.controls;
-  dom.messageText.textContent = workPhaseManager.message;
-
-  const items = dom.taskList ? dom.taskList.querySelectorAll('li') : [];
-
-  items.forEach((item) => {
-    const step = Number(item.getAttribute('data-step'));
-    item.classList.toggle('done', step < workPhaseManager.phaseIndex);
-    item.classList.toggle('active', step === workPhaseManager.phaseIndex);
-  });
-}
-
-function updateCamera(delta) {
-  let targetPos = new THREE.Vector3(0, 8, 12);
-  let lookAt = new THREE.Vector3(0, 0.8, 0);
-
-  if (cameraMode === 0) {
-    const base = activeVehicle ? activeVehicle.group.position : player.position;
-
-    if (isMobileDevice) {
-      targetPos.set(base.x, base.y + 7.0, base.z + 11.5);
-      lookAt.set(base.x, base.y + 1.1, base.z - 2.3);
-    } else {
-      targetPos.set(base.x, base.y + 5.6, base.z + 9.2);
-      lookAt.set(base.x, base.y + 1.1, base.z);
-    }
-  } else if (cameraMode === 1) {
-    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(loader.group.quaternion);
-    targetPos.copy(loader.group.position)
-      .addScaledVector(forward, isMobileDevice ? 12 : 9.5)
-      .add(new THREE.Vector3(0, isMobileDevice ? 5.8 : 4.4, 0));
-    lookAt.copy(loader.group.position).add(new THREE.Vector3(0, 1.45, 0));
-  } else if (cameraMode === 2) {
-    targetPos.copy(tamper.group.position)
-      .add(new THREE.Vector3(0, isMobileDevice ? 6.5 : 5.4, isMobileDevice ? 13 : 10.5));
-    lookAt.copy(tamper.group.position).add(new THREE.Vector3(0, 1.4, -2.6));
-  } else {
-    targetPos.set(30, 31, 58);
-    lookAt.set(2, 0, -18);
-  }
-
-  camera.position.lerp(targetPos, 1 - Math.exp(-5 * delta));
-  camera.lookAt(lookAt);
-}
-
-function ensureAudio() {
-  if (!audioCtx) {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (AudioContext) audioCtx = new AudioContext();
-  }
-}
-
-function playTone(frequency, duration, type) {
-  ensureAudio();
-
-  if (!audioCtx) return;
-
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.type = type || 'sine';
-  osc.frequency.value = frequency;
-
-  gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.05, audioCtx.currentTime + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
-
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  osc.start();
-  osc.stop(audioCtx.currentTime + duration + 0.02);
-}
-
-function animate() {
-  requestAnimationFrame(animate);
-
-  const delta = Math.min(clock.getDelta(), 0.05);
-
-  updatePlayer(delta);
-  updateVehicles(delta);
-  updateWorkPhases(delta);
-  updateInteractionHints(delta);
-  updateHUD();
-  updateCamera(delta);
-
-  renderer.render(scene, camera);
-}
-
-init();
