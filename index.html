@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Simulazione Armamento Ferroviario</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -17,7 +17,7 @@
           fissala e rincalza il binario fino a raggiungere qualità sufficiente.
         </p>
         <button id="playButton" type="button">Gioca</button>
-        <p class="small-note">Three.js r128 via CDN · HTML/CSS/JavaScript puro</p>
+        <p class="small-note">Ottimizzato per smartphone · Three.js r128 via CDN</p>
       </div>
     </div>
 
@@ -26,14 +26,22 @@
         <div class="hud-title">FASE</div>
         <div id="phaseName" class="hud-value">-</div>
       </div>
+
       <div class="hud-section">
         <div class="hud-title">OBIETTIVO</div>
         <div id="phaseObjective" class="hud-text">-</div>
       </div>
+
       <div class="hud-section">
-        <div class="hud-row"><span>Progresso fase</span><strong id="phaseProgressText">0%</strong></div>
-        <div class="bar"><div id="phaseProgressBar" class="bar-fill"></div></div>
+        <div class="hud-row">
+          <span>Progresso fase</span>
+          <strong id="phaseProgressText">0%</strong>
+        </div>
+        <div class="bar">
+          <div id="phaseProgressBar" class="bar-fill"></div>
+        </div>
       </div>
+
       <div class="hud-section compact">
         <div class="hud-row"><span>Rotaia sostituita</span><strong id="railProgressText">0%</strong></div>
         <div class="hud-row"><span>Fissaggio</span><strong id="fasteningProgressText">0%</strong></div>
@@ -42,30 +50,34 @@
         <div class="hud-row"><span>Compattazione ballast</span><strong id="compactionText">0%</strong></div>
         <div class="hud-row"><span>Sicurezza cantiere</span><strong id="safetyText">0%</strong></div>
       </div>
+
       <div class="hud-section">
         <div class="hud-title">COMANDI</div>
         <div id="controlsText" class="hud-text">-</div>
       </div>
+
       <div class="hud-section tutorial">
         <div id="messageText">Avvicinati al binario evidenziato.</div>
       </div>
     </div>
 
     <div id="interactionHint" class="interaction-hint hidden">Premi E</div>
+
     <button id="hudToggle" class="hud-toggle hidden" type="button">HUD</button>
 
-<div id="mobileControls" class="mobile-controls hidden">
-  <div id="touchStick" class="touch-stick">
-    <div id="touchKnob" class="touch-knob"></div>
-  </div>
+    <div id="mobileControls" class="mobile-controls hidden">
+      <div id="touchStick" class="touch-stick">
+        <div id="touchKnob" class="touch-knob"></div>
+      </div>
 
-  <div class="mobile-actions">
-    <button id="mobileInteract" type="button">E</button>
-    <button id="mobileAction" type="button">AZIONE</button>
-    <button id="mobileCamera" type="button">CAM</button>
-    <button id="mobileMenu" type="button">MENU</button>
-  </div>
-</div>
+      <div class="mobile-actions">
+        <button id="mobileInteract" type="button">E</button>
+        <button id="mobileAction" type="button">AZIONE</button>
+        <button id="mobileCamera" type="button">CAM</button>
+        <button id="mobileMenu" type="button">MENU</button>
+      </div>
+    </div>
+
     <div id="finalScreen" class="screen final hidden">
       <div class="menu-card success">
         <p class="eyebrow">Missione completata</p>
