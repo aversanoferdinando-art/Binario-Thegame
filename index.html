@@ -1,97 +1,70 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Ferrovia 3D - Armamento</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="main.js" defer></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulazione Armamento Ferroviario</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="game-container"></div>
-  <div id="crosshair"></div>
-
-  <section id="main-menu" class="screen">
-    <div class="menu-card">
-      <h1>FERROVIA 3D</h1>
-      <p>Base stabile per mini-gioco 3D di armamento ferroviario</p>
-      <button id="btn-play" class="menu-btn primary">Gioca</button>
-      <button id="btn-controls" class="menu-btn">Comandi</button>
-      <button id="btn-settings" class="menu-btn">Impostazioni</button>
-    </div>
-  </section>
-
-  <section id="controls-menu" class="screen hidden">
-    <div class="menu-card wide">
-      <h2>Comandi</h2>
-      <p><b>PC:</b> WASD per muoversi, SHIFT per correre, mouse per ruotare la camera, rotellina per zoom, ESC pausa.</p>
-      <p><b>Telefono:</b> joystick a sinistra per muoversi, trascina sullo schermo per ruotare la camera.</p>
-      <button class="menu-btn back-btn">Indietro</button>
-    </div>
-  </section>
-
-  <section id="settings-menu" class="screen hidden">
-    <div class="menu-card wide">
-      <h2>Impostazioni</h2>
-      <label class="setting-row">
-        <span>Sensibilità camera</span>
-        <input id="camera-sensitivity" type="range" min="0.4" max="2.0" step="0.1" value="1">
-      </label>
-      <label class="setting-row">
-        <span>Distanza camera</span>
-        <input id="camera-distance" type="range" min="7" max="18" step="1" value="11">
-      </label>
-      <button class="menu-btn back-btn">Indietro</button>
-    </div>
-  </section>
-
-  <section id="pause-menu" class="screen hidden">
-    <div class="menu-card">
-      <h2>Pausa</h2>
-      <button id="btn-resume" class="menu-btn primary">Riprendi</button>
-      <button id="btn-home" class="menu-btn">Menu principale</button>
-    </div>
-  </section>
-
-  <div id="hud" class="hud hidden">
-    <div class="hud-top">
-      <div class="hud-card hud-left">
-        <div class="stat">
-          <span>HP</span>
-          <div class="bar"><i id="hp-bar"></i></div>
-        </div>
-        <div class="stat">
-          <span>STA</span>
-          <div class="bar"><i id="stamina-bar"></i></div>
-        </div>
-        <div class="hint-line">WASD muove · SHIFT corre · Mouse camera · Rotellina zoom · ESC pausa</div>
-      </div>
-
-      <div class="hud-card hud-right">
-        <b>Operaio</b>
-        <div id="money-label" class="money">€ 0</div>
-        <div id="xp-label" class="xp">XP 0</div>
+  <div id="gameRoot">
+    <div id="menuScreen" class="screen active">
+      <div class="menu-card">
+        <p class="eyebrow">Simulazione didattica 3D</p>
+        <h1>Sostituzione rotaia e rincalzatura binario</h1>
+        <p class="mission-text">
+          Metti in sicurezza il cantiere, rimuovi la rotaia vecchia, posa la rotaia nuova,
+          fissala e rincalza il binario fino a raggiungere qualità sufficiente.
+        </p>
+        <button id="playButton" type="button">Gioca</button>
+        <p class="small-note">Three.js r128 via CDN · HTML/CSS/JavaScript puro</p>
       </div>
     </div>
 
-    <button id="pause-button">PAUSA</button>
+    <div id="hud" class="hud hidden">
+      <div class="hud-section">
+        <div class="hud-title">FASE</div>
+        <div id="phaseName" class="hud-value">-</div>
+      </div>
+      <div class="hud-section">
+        <div class="hud-title">OBIETTIVO</div>
+        <div id="phaseObjective" class="hud-text">-</div>
+      </div>
+      <div class="hud-section">
+        <div class="hud-row"><span>Progresso fase</span><strong id="phaseProgressText">0%</strong></div>
+        <div class="bar"><div id="phaseProgressBar" class="bar-fill"></div></div>
+      </div>
+      <div class="hud-section compact">
+        <div class="hud-row"><span>Rotaia sostituita</span><strong id="railProgressText">0%</strong></div>
+        <div class="hud-row"><span>Fissaggio</span><strong id="fasteningProgressText">0%</strong></div>
+        <div class="hud-row"><span>Rincalzatura</span><strong id="tampingProgressText">0%</strong></div>
+        <div class="hud-row"><span>Qualità binario</span><strong id="qualityText">0%</strong></div>
+        <div class="hud-row"><span>Compattazione ballast</span><strong id="compactionText">0%</strong></div>
+        <div class="hud-row"><span>Sicurezza cantiere</span><strong id="safetyText">0%</strong></div>
+      </div>
+      <div class="hud-section">
+        <div class="hud-title">COMANDI</div>
+        <div id="controlsText" class="hud-text">-</div>
+      </div>
+      <div class="hud-section tutorial">
+        <div id="messageText">Avvicinati al binario evidenziato.</div>
+      </div>
+    </div>
 
-    <div class="objective-panel">
-      <div class="objective-title">FASE 1 - BASE STABILE</div>
-      <div class="objective-text">Muoviti nell’area ferroviaria e prova camera, joystick e comandi.</div>
+    <div id="interactionHint" class="interaction-hint hidden">Premi E</div>
+    <div id="finalScreen" class="screen final hidden">
+      <div class="menu-card success">
+        <p class="eyebrow">Missione completata</p>
+        <h2>Lavorazione completata</h2>
+        <p>
+          Rotaia sostituita, fissaggi completati, ballast rincalzato e geometria del binario riportata sopra soglia.
+        </p>
+        <button id="restartButton" type="button">Rigioca</button>
+      </div>
     </div>
   </div>
 
-  <div id="mobile-controls" class="mobile-controls">
-    <div id="joy-zone" class="joy-zone">
-      <div id="joy-knob" class="joy-knob"></div>
-    </div>
-
-    <div class="mobile-buttons">
-      <button id="btn-run" class="round-btn">CORSA</button>
-      <button id="btn-action" class="round-btn primary">AZIONE</button>
-    </div>
-  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
