@@ -1,5 +1,6 @@
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -11,6 +12,8 @@ body {
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #111827;
   color: #f8fafc;
+  touch-action: none;
+  overscroll-behavior: none;
 }
 
 #gameRoot {
@@ -31,11 +34,11 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 20;
+  z-index: 30;
   background:
     radial-gradient(circle at 30% 20%, rgba(59, 130, 246, 0.24), transparent 35%),
     linear-gradient(135deg, rgba(2, 6, 23, 0.95), rgba(15, 23, 42, 0.96));
-  padding: 24px;
+  padding: 22px;
 }
 
 .screen.hidden,
@@ -45,10 +48,10 @@ canvas {
 
 .menu-card {
   width: min(680px, 94vw);
-  padding: 32px;
+  padding: 30px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 24px;
-  background: rgba(15, 23, 42, 0.82);
+  background: rgba(15, 23, 42, 0.84);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(16px);
   text-align: left;
@@ -79,7 +82,7 @@ canvas {
 .menu-card p {
   max-width: 58ch;
   color: #cbd5e1;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
 .small-note {
@@ -100,19 +103,19 @@ button {
   box-shadow: 0 14px 35px rgba(249, 115, 22, 0.34);
 }
 
-button:hover {
-  transform: translateY(-1px);
+button:active {
+  transform: scale(0.97);
 }
 
 .hud {
   position: fixed;
-  top: 16px;
-  left: 16px;
-  width: min(360px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
+  top: 14px;
+  left: 14px;
+  width: min(350px, calc(100vw - 28px));
+  max-height: calc(100vh - 28px);
   overflow: auto;
-  z-index: 10;
-  padding: 14px;
+  z-index: 12;
+  padding: 12px;
   border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 20px;
   background: rgba(15, 23, 42, 0.76);
@@ -121,11 +124,11 @@ button:hover {
 }
 
 .hud-section {
-  padding: 12px;
+  padding: 10px;
   border-radius: 14px;
   background: rgba(15, 23, 42, 0.72);
   border: 1px solid rgba(148, 163, 184, 0.12);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .hud-section:last-child {
@@ -133,23 +136,23 @@ button:hover {
 }
 
 .hud-title {
-  margin-bottom: 6px;
-  font-size: 0.7rem;
+  margin-bottom: 5px;
+  font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0.14em;
   color: #93c5fd;
 }
 
 .hud-value {
-  font-size: 1.02rem;
+  font-size: 0.98rem;
   font-weight: 900;
   color: #f8fafc;
 }
 
 .hud-text {
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   color: #dbeafe;
-  line-height: 1.45;
+  line-height: 1.38;
   white-space: pre-line;
 }
 
@@ -158,8 +161,8 @@ button:hover {
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  margin: 7px 0;
-  font-size: 0.84rem;
+  margin: 5px 0;
+  font-size: 0.8rem;
   color: #cbd5e1;
 }
 
@@ -186,7 +189,7 @@ button:hover {
   background: rgba(30, 41, 59, 0.86);
   color: #fef3c7;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.38;
 }
 
 .interaction-hint {
@@ -194,7 +197,7 @@ button:hover {
   left: 50%;
   bottom: 34px;
   transform: translateX(-50%);
-  z-index: 12;
+  z-index: 18;
   padding: 12px 18px;
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.86);
@@ -203,10 +206,11 @@ button:hover {
   font-weight: 900;
   box-shadow: 0 16px 45px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(10px);
+  text-align: center;
 }
 
 .final {
-  z-index: 30;
+  z-index: 40;
   background: rgba(2, 6, 23, 0.78);
 }
 
@@ -214,40 +218,13 @@ button:hover {
   border-color: rgba(34, 197, 94, 0.45);
 }
 
-@media (max-width: 720px) {
-  .hud {
-    top: 8px;
-    left: 8px;
-    width: calc(100vw - 16px);
-    max-height: 46vh;
-    padding: 8px;
-    border-radius: 14px;
-  }
-
-  .hud-section {
-    padding: 8px;
-    margin-bottom: 6px;
-  }
-
-  .menu-card {
-    padding: 22px;
-  }
-
-  .interaction-hint {
-    bottom: 16px;
-    max-width: calc(100vw - 28px);
-    text-align: center;
-  }
-}
-/* ============================= */
-/* MOBILE GAMEPLAY FIX */
-/* ============================= */
+/* MOBILE */
 
 .hud-toggle {
   position: fixed;
-  top: 12px;
-  left: 12px;
-  z-index: 18;
+  top: 10px;
+  left: 10px;
+  z-index: 22;
   width: 58px;
   height: 38px;
   padding: 0;
@@ -264,7 +241,7 @@ button:hover {
 .mobile-controls {
   position: fixed;
   inset: 0;
-  z-index: 15;
+  z-index: 16;
   pointer-events: none;
 }
 
@@ -310,7 +287,7 @@ button:hover {
   height: 54px;
   padding: 0;
   border-radius: 18px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 900;
   color: #0f172a;
   background: linear-gradient(135deg, #facc15, #f97316);
@@ -318,15 +295,9 @@ button:hover {
   touch-action: manipulation;
 }
 
-.mobile-actions button:active,
-.hud-toggle:active {
-  transform: scale(0.96);
-}
-
-/* Schermi piccoli: HUD compatto e gioco più libero */
 @media (max-width: 900px) {
   .hud {
-    top: 58px;
+    top: 54px;
     left: 10px;
     width: min(310px, calc(100vw - 20px));
     max-height: 34vh;
@@ -343,12 +314,6 @@ button:hover {
     padding: 8px;
     margin-bottom: 6px;
     border-radius: 12px;
-  }
-
-  .hud-section.compact {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 2px;
   }
 
   .hud-title {
@@ -374,13 +339,13 @@ button:hover {
   }
 
   .tutorial {
-    font-size: 0.78rem;
+    font-size: 0.76rem;
   }
 
   .interaction-hint {
     bottom: 160px;
     padding: 9px 13px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     max-width: 82vw;
   }
 
@@ -392,7 +357,7 @@ button:hover {
 
   .menu-card h1,
   .menu-card h2 {
-    font-size: clamp(1.8rem, 8vw, 3.2rem);
+    font-size: clamp(1.75rem, 8vw, 3.2rem);
     line-height: 1;
   }
 
@@ -402,10 +367,9 @@ button:hover {
   }
 }
 
-/* iPhone in orizzontale: HUD ancora più piccolo */
 @media (max-height: 520px) and (orientation: landscape) {
   .hud {
-    top: 54px;
+    top: 52px;
     left: 10px;
     width: 280px;
     max-height: 58vh;
