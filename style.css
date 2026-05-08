@@ -1,114 +1,849 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Binario - The Game</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <div id="gameRoot">
-    <div id="splashScreen" class="splash-screen">
-      <div class="splash-panel">
-        <p class="splash-kicker">Railway worksite simulator</p>
-        <h1>Binario<br><span>The Game</span></h1>
-        <p>Simulazione dinamica di armamento ferroviario: rotaie, fissaggi, rincalzatura e cantiere.</p>
-        <button id="splashEnterButton" type="button">Entra</button>
-      </div>
-    </div>
-
-    <div id="menuScreen" class="screen hidden">
-      <div class="menu-card">
-        <p class="eyebrow">Simulatore didattico 3D</p>
-        <h1>Cantiere di armamento ferroviario</h1>
-        <p class="mission-text">
-          Metti in sicurezza il cantiere, rimuovi la rotaia vecchia, posa la rotaia nuova,
-          completa i fissaggi e rincalza il binario fino a raggiungere la qualità richiesta.
-        </p>
-        <button id="playButton" type="button">Gioca</button>
-        <p class="small-note">Ottimizzato per smartphone · Three.js r128 · GitHub Pages</p>
-      </div>
-    </div>
-
-    <aside id="hud" class="hud hidden">
-      <div class="hud-head">
-        <div>
-          <p class="hud-kicker">Missione</p>
-          <h2>Sostituzione rotaia</h2>
-        </div>
-        <button id="hudClose" type="button" aria-label="Chiudi HUD">×</button>
-      </div>
-
-      <div class="hud-block">
-        <div class="hud-label">FASE ATTUALE</div>
-        <div id="phaseName" class="hud-value">-</div>
-        <div id="phaseObjective" class="hud-note">-</div>
-        <div class="progress-line">
-          <span>Progresso</span>
-          <strong id="phaseProgressText">0%</strong>
-        </div>
-        <div class="bar">
-          <div id="phaseProgressBar" class="bar-fill"></div>
-        </div>
-      </div>
-
-      <div class="hud-block task-block">
-        <div class="hud-label">TASK</div>
-        <ul id="taskList" class="task-list">
-          <li data-step="0">Ispezione</li>
-          <li data-step="1">Preparazione</li>
-          <li data-step="2">Rimozione rotaia</li>
-          <li data-step="3">Posa rotaia</li>
-          <li data-step="4">Fissaggio</li>
-          <li data-step="5">Rincalzatura</li>
-          <li data-step="6">Controllo finale</li>
-        </ul>
-      </div>
-
-      <div class="hud-block metrics-grid">
-        <div><span>Rotaia</span><strong id="railProgressText">0%</strong></div>
-        <div><span>Fissaggio</span><strong id="fasteningProgressText">0%</strong></div>
-        <div><span>Rincalzatura</span><strong id="tampingProgressText">0%</strong></div>
-        <div><span>Geometria</span><strong id="qualityText">0%</strong></div>
-        <div><span>Ballast</span><strong id="compactionText">0%</strong></div>
-        <div><span>Sicurezza</span><strong id="safetyText">0%</strong></div>
-      </div>
-
-      <div class="hud-block controls-block">
-        <div class="hud-label">COMANDI</div>
-        <div id="controlsText" class="hud-note">-</div>
-      </div>
-
-      <div id="messageText" class="hud-message">Avvicinati alla zona evidenziata.</div>
-    </aside>
-
-    <div id="interactionHint" class="interaction-hint hidden">Premi E</div>
-    <button id="hudToggle" class="hud-toggle hidden" type="button">HUD</button>
-
-    <div id="mobileControls" class="mobile-controls hidden">
-      <div id="touchStick" class="touch-stick">
-        <div id="touchKnob" class="touch-knob"></div>
-      </div>
-
-      <div class="mobile-actions">
-        <button id="mobileInteract" type="button">E</button>
-        <button id="mobileAction" type="button">AZIONE</button>
-        <button id="mobileCamera" type="button">CAM</button>
-        <button id="mobileMenu" type="button">MENU</button>
-      </div>
-    </div>
-
-    <div id="finalScreen" class="screen final hidden">
-      <div class="menu-card success">
-        <p class="eyebrow">Missione completata</p>
-        <h2>Lavorazione completata</h2>
-        <p>Rotaia sostituita, fissaggi chiusi, ballast rincalzato e geometria del binario sopra soglia.</p>
-        <button id="restartButton" type="button">Rigioca</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="main.js"></script>
-</body>
-</html>
+diff --git a/style.css b/style.css
+index 997bcdf836eb16741076b65d19d4cfe9960e8a74..a0fe58f6f83f0b7a0041670e34ee395388cf195a 100644
+--- a/style.css
++++ b/style.css
+@@ -1,114 +1,730 @@
+-<!DOCTYPE html>
+-<html lang="it">
+-<head>
+-  <meta charset="UTF-8" />
+-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+-  <title>Binario - The Game</title>
+-  <link rel="stylesheet" href="style.css" />
+-</head>
+-<body>
+-  <div id="gameRoot">
+-    <div id="splashScreen" class="splash-screen">
+-      <div class="splash-panel">
+-        <p class="splash-kicker">Railway worksite simulator</p>
+-        <h1>Binario<br><span>The Game</span></h1>
+-        <p>Simulazione dinamica di armamento ferroviario: rotaie, fissaggi, rincalzatura e cantiere.</p>
+-        <button id="splashEnterButton" type="button">Entra</button>
+-      </div>
+-    </div>
+-
+-    <div id="menuScreen" class="screen hidden">
+-      <div class="menu-card">
+-        <p class="eyebrow">Simulatore didattico 3D</p>
+-        <h1>Cantiere di armamento ferroviario</h1>
+-        <p class="mission-text">
+-          Metti in sicurezza il cantiere, rimuovi la rotaia vecchia, posa la rotaia nuova,
+-          completa i fissaggi e rincalza il binario fino a raggiungere la qualità richiesta.
+-        </p>
+-        <button id="playButton" type="button">Gioca</button>
+-        <p class="small-note">Ottimizzato per smartphone · Three.js r128 · GitHub Pages</p>
+-      </div>
+-    </div>
+-
+-    <aside id="hud" class="hud hidden">
+-      <div class="hud-head">
+-        <div>
+-          <p class="hud-kicker">Missione</p>
+-          <h2>Sostituzione rotaia</h2>
+-        </div>
+-        <button id="hudClose" type="button" aria-label="Chiudi HUD">×</button>
+-      </div>
+-
+-      <div class="hud-block">
+-        <div class="hud-label">FASE ATTUALE</div>
+-        <div id="phaseName" class="hud-value">-</div>
+-        <div id="phaseObjective" class="hud-note">-</div>
+-        <div class="progress-line">
+-          <span>Progresso</span>
+-          <strong id="phaseProgressText">0%</strong>
+-        </div>
+-        <div class="bar">
+-          <div id="phaseProgressBar" class="bar-fill"></div>
+-        </div>
+-      </div>
+-
+-      <div class="hud-block task-block">
+-        <div class="hud-label">TASK</div>
+-        <ul id="taskList" class="task-list">
+-          <li data-step="0">Ispezione</li>
+-          <li data-step="1">Preparazione</li>
+-          <li data-step="2">Rimozione rotaia</li>
+-          <li data-step="3">Posa rotaia</li>
+-          <li data-step="4">Fissaggio</li>
+-          <li data-step="5">Rincalzatura</li>
+-          <li data-step="6">Controllo finale</li>
+-        </ul>
+-      </div>
+-
+-      <div class="hud-block metrics-grid">
+-        <div><span>Rotaia</span><strong id="railProgressText">0%</strong></div>
+-        <div><span>Fissaggio</span><strong id="fasteningProgressText">0%</strong></div>
+-        <div><span>Rincalzatura</span><strong id="tampingProgressText">0%</strong></div>
+-        <div><span>Geometria</span><strong id="qualityText">0%</strong></div>
+-        <div><span>Ballast</span><strong id="compactionText">0%</strong></div>
+-        <div><span>Sicurezza</span><strong id="safetyText">0%</strong></div>
+-      </div>
+-
+-      <div class="hud-block controls-block">
+-        <div class="hud-label">COMANDI</div>
+-        <div id="controlsText" class="hud-note">-</div>
+-      </div>
+-
+-      <div id="messageText" class="hud-message">Avvicinati alla zona evidenziata.</div>
+-    </aside>
+-
+-    <div id="interactionHint" class="interaction-hint hidden">Premi E</div>
+-    <button id="hudToggle" class="hud-toggle hidden" type="button">HUD</button>
+-
+-    <div id="mobileControls" class="mobile-controls hidden">
+-      <div id="touchStick" class="touch-stick">
+-        <div id="touchKnob" class="touch-knob"></div>
+-      </div>
+-
+-      <div class="mobile-actions">
+-        <button id="mobileInteract" type="button">E</button>
+-        <button id="mobileAction" type="button">AZIONE</button>
+-        <button id="mobileCamera" type="button">CAM</button>
+-        <button id="mobileMenu" type="button">MENU</button>
+-      </div>
+-    </div>
+-
+-    <div id="finalScreen" class="screen final hidden">
+-      <div class="menu-card success">
+-        <p class="eyebrow">Missione completata</p>
+-        <h2>Lavorazione completata</h2>
+-        <p>Rotaia sostituita, fissaggi chiusi, ballast rincalzato e geometria del binario sopra soglia.</p>
+-        <button id="restartButton" type="button">Rigioca</button>
+-      </div>
+-    </div>
+-  </div>
+-
+-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+-  <script src="main.js"></script>
+-</body>
+-</html>
++* {
++  box-sizing: border-box;
++  -webkit-tap-highlight-color: transparent;
++}
++
++html,
++body {
++  width: 100%;
++  height: 100%;
++  margin: 0;
++  overflow: hidden;
++  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++  background: #0f172a;
++  color: #f8fafc;
++  touch-action: none;
++  overscroll-behavior: none;
++  -webkit-user-select: none;
++  user-select: none;
++}
++
++:root {
++  --safe-top: env(safe-area-inset-top, 0px);
++  --safe-right: env(safe-area-inset-right, 0px);
++  --safe-bottom: env(safe-area-inset-bottom, 0px);
++  --safe-left: env(safe-area-inset-left, 0px);
++}
++
++#gameRoot {
++  position: fixed;
++  inset: 0;
++  width: 100vw;
++  height: 100vh;
++  height: 100dvh;
++  overflow: hidden;
++}
++
++canvas {
++  display: block;
++  width: 100%;
++  height: 100%;
++}
++
++.hidden,
++.screen.hidden,
++.splash-screen.hidden {
++  display: none !important;
++}
++
++.splash-screen {
++  position: fixed;
++  inset: 0;
++  z-index: 80;
++  display: flex;
++  align-items: flex-end;
++  justify-content: center;
++  padding: 24px;
++  background:
++    linear-gradient(90deg, rgba(2, 6, 23, 0.70), rgba(2, 6, 23, 0.16), rgba(2, 6, 23, 0.72)),
++    url("splash.jpg") center / cover no-repeat,
++    radial-gradient(circle at center, #1f2937, #020617);
++}
++
++.splash-panel {
++  width: min(620px, 94vw);
++  padding: 18px 20px;
++  border-radius: 22px;
++  border: 1px solid rgba(226, 232, 240, 0.22);
++  background: rgba(2, 6, 23, 0.64);
++  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.55);
++  backdrop-filter: blur(10px);
++  text-align: center;
++}
++
++.splash-kicker,
++.eyebrow,
++.hud-kicker {
++  margin: 0;
++  color: #facc15;
++  font-size: 0.72rem;
++  font-weight: 900;
++  letter-spacing: 0.16em;
++  text-transform: uppercase;
++}
++
++.splash-panel h1 {
++  margin: 0 0 8px;
++  font-size: clamp(2.2rem, 8vw, 5.2rem);
++  line-height: 0.84;
++  letter-spacing: -0.07em;
++  text-transform: uppercase;
++  text-shadow: 0 5px 22px rgba(0, 0, 0, 0.75);
++}
++
++.splash-panel h1 span {
++  font-size: 0.45em;
++  letter-spacing: 0.18em;
++  color: #e5e7eb;
++}
++
++.splash-panel p {
++  margin: 0 auto 14px;
++  max-width: 52ch;
++  color: #dbeafe;
++  line-height: 1.45;
++  font-size: 0.92rem;
++}
++
++.screen {
++  position: fixed;
++  inset: 0;
++  z-index: 60;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  padding: 22px;
++  background:
++    radial-gradient(circle at 28% 22%, rgba(56, 189, 248, 0.22), transparent 36%),
++    linear-gradient(135deg, rgba(2, 6, 23, 0.96), rgba(15, 23, 42, 0.96));
++}
++
++.menu-card {
++  width: min(680px, 94vw);
++  padding: 30px;
++  border: 1px solid rgba(226, 232, 240, 0.16);
++  border-radius: 24px;
++  background: rgba(15, 23, 42, 0.86);
++  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
++  backdrop-filter: blur(18px);
++}
++
++.menu-card h1,
++.menu-card h2 {
++  margin: 8px 0 16px;
++  font-size: clamp(2rem, 6vw, 4.2rem);
++  line-height: 0.96;
++  letter-spacing: -0.055em;
++}
++
++.menu-card p {
++  max-width: 58ch;
++  color: #cbd5e1;
++  line-height: 1.58;
++}
++
++.small-note {
++  margin-top: 18px;
++  font-size: 0.82rem;
++  color: #94a3b8 !important;
++}
++
++.tutorial {
++  z-index: 64;
++}
++
++.tutorial-card h2 {
++  margin-bottom: 18px;
++}
++
++.tutorial-grid {
++  display: grid;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  gap: 12px;
++  margin: 18px 0 22px;
++}
++
++.tutorial-grid div {
++  padding: 13px;
++  border-radius: 16px;
++  background: rgba(30, 41, 59, 0.62);
++  border: 1px solid rgba(148, 163, 184, 0.14);
++}
++
++.tutorial-grid strong,
++.tutorial-grid span {
++  display: block;
++}
++
++.tutorial-grid strong {
++  margin-bottom: 6px;
++  color: #fef3c7;
++  font-size: 0.9rem;
++}
++
++.tutorial-grid span {
++  color: #cbd5e1;
++  font-size: 0.82rem;
++  line-height: 1.42;
++}
++
++.tutorial-actions {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 10px;
++}
++
++button {
++  min-width: 44px;
++  min-height: 44px;
++  border: 0;
++  border-radius: 999px;
++  padding: 13px 22px;
++  font-weight: 900;
++  letter-spacing: 0.02em;
++  color: #111827;
++  background: linear-gradient(135deg, #fbbf24, #f97316);
++  cursor: pointer;
++  box-shadow: 0 14px 35px rgba(249, 115, 22, 0.32);
++}
++
++button:active,
++button.is-pressed {
++  transform: scale(0.97);
++}
++
++.secondary-button {
++  color: #e5e7eb;
++  background: rgba(30, 41, 59, 0.86);
++  border: 1px solid rgba(226, 232, 240, 0.18);
++  box-shadow: none;
++}
++
++.hud {
++  position: fixed;
++  top: 14px;
++  right: 14px;
++  width: 318px;
++  max-height: calc(100vh - 28px);
++  overflow: auto;
++  z-index: 22;
++  padding: 10px;
++  border: 1px solid rgba(226, 232, 240, 0.14);
++  border-radius: 18px;
++  background: rgba(15, 23, 42, 0.72);
++  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.38);
++  backdrop-filter: blur(12px);
++}
++
++.hud-head {
++  display: flex;
++  align-items: flex-start;
++  justify-content: space-between;
++  gap: 10px;
++  padding: 8px 8px 10px;
++}
++
++.hud h2 {
++  margin: 3px 0 0;
++  font-size: 1rem;
++  line-height: 1.05;
++}
++
++#hudClose {
++  width: 30px;
++  height: 30px;
++  padding: 0;
++  border-radius: 10px;
++  color: #e5e7eb;
++  background: rgba(30, 41, 59, 0.72);
++  box-shadow: none;
++}
++
++.hud-block {
++  padding: 10px;
++  margin-bottom: 8px;
++  border-radius: 14px;
++  background: rgba(15, 23, 42, 0.66);
++  border: 1px solid rgba(148, 163, 184, 0.12);
++}
++
++.hud-label {
++  margin-bottom: 6px;
++  font-size: 0.64rem;
++  font-weight: 900;
++  letter-spacing: 0.14em;
++  color: #93c5fd;
++}
++
++.hud-value {
++  font-size: 0.92rem;
++  font-weight: 900;
++}
++
++.hud-note {
++  margin-top: 5px;
++  font-size: 0.76rem;
++  line-height: 1.34;
++  color: #dbeafe;
++  white-space: pre-line;
++}
++
++.progress-line {
++  display: flex;
++  justify-content: space-between;
++  margin-top: 8px;
++  font-size: 0.74rem;
++  color: #cbd5e1;
++}
++
++.bar {
++  height: 6px;
++  margin-top: 5px;
++  overflow: hidden;
++  border-radius: 999px;
++  background: rgba(148, 163, 184, 0.22);
++}
++
++.bar-fill {
++  width: 0%;
++  height: 100%;
++  border-radius: inherit;
++  background: linear-gradient(90deg, #38bdf8, #22c55e);
++  transition: width 0.18s ease;
++}
++
++.task-list {
++  list-style: none;
++  padding: 0;
++  margin: 0;
++}
++
++.task-list li {
++  position: relative;
++  padding: 4px 0 4px 22px;
++  font-size: 0.74rem;
++  color: #cbd5e1;
++}
++
++.task-list li::before {
++  content: "";
++  position: absolute;
++  left: 0;
++  top: 8px;
++  width: 11px;
++  height: 11px;
++  border-radius: 3px;
++  border: 1px solid rgba(226, 232, 240, 0.45);
++  background: rgba(15, 23, 42, 0.6);
++}
++
++.task-list li.active {
++  color: #fef3c7;
++  font-weight: 800;
++}
++
++.task-list li.active::before {
++  background: #facc15;
++  border-color: #facc15;
++}
++
++.task-list li.done {
++  color: #bbf7d0;
++}
++
++.task-list li.done::before {
++  background: #22c55e;
++  border-color: #22c55e;
++}
++
++.metrics-grid {
++  display: grid;
++  grid-template-columns: 1fr 1fr;
++  gap: 6px;
++}
++
++.metrics-grid div {
++  padding: 7px;
++  border-radius: 10px;
++  background: rgba(30, 41, 59, 0.54);
++}
++
++.metrics-grid span {
++  display: block;
++  font-size: 0.64rem;
++  color: #94a3b8;
++}
++
++.metrics-grid strong {
++  display: block;
++  margin-top: 2px;
++  font-size: 0.88rem;
++  color: #f8fafc;
++}
++
++.hud-message {
++  padding: 10px;
++  border-radius: 14px;
++  background: rgba(30, 41, 59, 0.86);
++  color: #fef3c7;
++  font-size: 0.78rem;
++  font-weight: 800;
++  line-height: 1.35;
++}
++
++.help-button {
++  width: 100%;
++  margin-top: 8px;
++  padding: 11px 12px;
++  border-radius: 14px;
++  color: #e0f2fe;
++  background: rgba(14, 116, 144, 0.72);
++  border: 1px solid rgba(125, 211, 252, 0.34);
++  box-shadow: none;
++}
++
++.interaction-hint {
++  position: fixed;
++  left: 50%;
++  bottom: 34px;
++  transform: translateX(-50%);
++  z-index: 26;
++  padding: 10px 15px;
++  border-radius: 999px;
++  background: rgba(15, 23, 42, 0.86);
++  border: 1px solid rgba(250, 204, 21, 0.45);
++  color: #fef08a;
++  font-weight: 900;
++  font-size: 0.86rem;
++  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.35);
++  backdrop-filter: blur(10px);
++  text-align: center;
++}
++
++.final {
++  z-index: 70;
++  background: rgba(2, 6, 23, 0.78);
++}
++
++.success {
++  border-color: rgba(34, 197, 94, 0.45);
++}
++
++.hud-toggle {
++  position: fixed;
++  top: calc(10px + var(--safe-top));
++  left: calc(10px + var(--safe-left));
++  z-index: 28;
++  width: 58px;
++  height: 38px;
++  padding: 0;
++  border-radius: 14px;
++  font-size: 0.78rem;
++  font-weight: 900;
++  color: #f8fafc;
++  background: rgba(15, 23, 42, 0.82);
++  border: 1px solid rgba(147, 197, 253, 0.45);
++  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
++  backdrop-filter: blur(10px);
++}
++
++.mobile-controls {
++  position: fixed;
++  inset: 0;
++  z-index: 20;
++  pointer-events: none;
++}
++
++.touch-stick {
++  position: absolute;
++  left: calc(22px + var(--safe-left));
++  bottom: calc(28px + var(--safe-bottom));
++  width: 118px;
++  height: 118px;
++  border-radius: 50%;
++  background: rgba(15, 23, 42, 0.48);
++  border: 1px solid rgba(226, 232, 240, 0.28);
++  box-shadow: 0 12px 35px rgba(0,0,0,0.32);
++  backdrop-filter: blur(8px);
++  pointer-events: auto;
++  touch-action: none;
++}
++
++.touch-knob {
++  position: absolute;
++  left: 50%;
++  top: 50%;
++  width: 54px;
++  height: 54px;
++  border-radius: 50%;
++  transform: translate(-50%, -50%);
++  background: rgba(248, 250, 252, 0.72);
++  border: 2px solid rgba(59, 130, 246, 0.75);
++  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
++}
++
++.mobile-actions {
++  position: absolute;
++  right: calc(18px + var(--safe-right));
++  bottom: calc(24px + var(--safe-bottom));
++  display: grid;
++  grid-template-columns: 74px 92px;
++  gap: 10px;
++  pointer-events: auto;
++}
++
++.mobile-actions button {
++  height: 54px;
++  padding: 0;
++  border-radius: 18px;
++  font-size: 0.76rem;
++  font-weight: 900;
++  color: #0f172a;
++  background: linear-gradient(135deg, #facc15, #f97316);
++  box-shadow: 0 12px 28px rgba(0,0,0,0.34);
++  touch-action: manipulation;
++  -webkit-user-select: none;
++  user-select: none;
++}
++
++@media (max-width: 900px) {
++  .splash-screen {
++    align-items: flex-end;
++    padding: 16px;
++    background-position: center center;
++  }
++
++  .splash-panel {
++    padding: 14px;
++    border-radius: 18px;
++  }
++
++  .splash-panel p {
++    font-size: 0.82rem;
++  }
++
++  .hud {
++    top: calc(54px + var(--safe-top));
++    left: calc(10px + var(--safe-left));
++    right: auto;
++    width: min(308px, calc(100vw - 20px - var(--safe-left) - var(--safe-right)));
++    max-height: min(43vh, 360px);
++    -webkit-overflow-scrolling: touch;
++    padding: 8px;
++    border-radius: 16px;
++  }
++
++  .hud.mobile-collapsed {
++    display: none !important;
++  }
++
++  .hud-block {
++    padding: 8px;
++    margin-bottom: 6px;
++    border-radius: 12px;
++  }
++
++  .task-block,
++  .controls-block {
++    display: none;
++  }
++
++  .hud-note {
++    font-size: 0.72rem;
++  }
++
++  .metrics-grid {
++    grid-template-columns: 1fr 1fr 1fr;
++    gap: 5px;
++  }
++
++  .metrics-grid div {
++    padding: 5px;
++  }
++
++  .metrics-grid span {
++    font-size: 0.58rem;
++  }
++
++  .metrics-grid strong {
++    font-size: 0.74rem;
++  }
++
++  .hud-message {
++    font-size: 0.72rem;
++    padding: 8px;
++  }
++
++  .interaction-hint {
++    bottom: calc(160px + var(--safe-bottom));
++    padding: 9px 13px;
++    font-size: 0.78rem;
++    max-width: 82vw;
++  }
++
++  .menu-card {
++    width: min(92vw, 520px);
++    max-height: calc(100dvh - 32px - var(--safe-top) - var(--safe-bottom));
++    overflow: auto;
++    -webkit-overflow-scrolling: touch;
++    padding: 22px;
++    border-radius: 20px;
++  }
++
++  .menu-card h1,
++  .menu-card h2 {
++    font-size: clamp(1.75rem, 8vw, 3.2rem);
++    line-height: 1;
++  }
++
++  .tutorial-grid {
++    grid-template-columns: 1fr;
++    gap: 8px;
++    margin: 12px 0 16px;
++  }
++
++  .tutorial-grid div {
++    padding: 10px;
++  }
++
++  .tutorial-grid strong {
++    font-size: 0.82rem;
++  }
++
++  .tutorial-grid span {
++    font-size: 0.74rem;
++  }
++
++  .tutorial-actions button {
++    flex: 1 1 136px;
++  }
++}
++
++@media (max-width: 420px) {
++  .splash-screen,
++  .screen {
++    padding: calc(12px + var(--safe-top)) calc(12px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(12px + var(--safe-left));
++  }
++
++  .splash-panel,
++  .menu-card {
++    width: min(94vw, 420px);
++    padding: 16px;
++  }
++
++  .splash-panel h1 {
++    font-size: clamp(2rem, 13vw, 3.4rem);
++  }
++
++  .hud {
++    width: min(292px, calc(100vw - 20px - var(--safe-left) - var(--safe-right)));
++    max-height: 38vh;
++  }
++
++  .touch-stick {
++    width: 108px;
++    height: 108px;
++  }
++
++  .touch-knob {
++    width: 50px;
++    height: 50px;
++  }
++
++  .mobile-actions {
++    grid-template-columns: 68px 82px;
++    gap: 8px;
++  }
++
++  .mobile-actions button {
++    height: 50px;
++    border-radius: 16px;
++    font-size: 0.68rem;
++  }
++}
++
++@media (max-height: 520px) and (orientation: landscape) {
++  .splash-screen {
++    justify-content: flex-start;
++    align-items: flex-end;
++    padding: 12px;
++  }
++
++  .splash-panel {
++    width: min(420px, 52vw);
++    padding: 12px;
++    text-align: left;
++  }
++
++  .splash-panel h1 {
++    font-size: clamp(1.8rem, 5vw, 3.2rem);
++  }
++
++  .splash-panel p {
++    font-size: 0.74rem;
++    margin-left: 0;
++  }
++
++  .hud {
++    top: 52px;
++    left: 10px;
++    width: 260px;
++    max-height: 58vh;
++  }
++
++  .hud-block:nth-child(2) .hud-note {
++    display: none;
++  }
++
++  .metrics-grid {
++    grid-template-columns: 1fr 1fr;
++  }
++
++  .touch-stick {
++    width: 104px;
++    height: 104px;
++    left: calc(20px + var(--safe-left));
++    bottom: calc(18px + var(--safe-bottom));
++  }
++
++  .touch-knob {
++    width: 48px;
++    height: 48px;
++  }
++
++  .mobile-actions {
++    right: calc(16px + var(--safe-right));
++    bottom: calc(16px + var(--safe-bottom));
++    grid-template-columns: 66px 84px;
++    gap: 8px;
++  }
++
++  .mobile-actions button {
++    height: 48px;
++    border-radius: 15px;
++    font-size: 0.68rem;
++  }
++
++  .interaction-hint {
++    bottom: calc(132px + var(--safe-bottom));
++  }
++}
