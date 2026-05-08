@@ -1,4 +1,4 @@
-* global THREE */
+/* global THREE */
 'use strict';
 
 let scene;
@@ -14,7 +14,7 @@ let activeVehicle = null;
 let cameraMode = 0;
 let gameStarted = false;
 let isMobileDevice = false;
-let lastSafePlayerPosition = new THREE.Vector3();
+let lastSafePlayerPosition;
 let lastMobileButtonTime = 0;
 
 const keys = Object.create(null);
@@ -843,9 +843,17 @@ class WorkPhaseManager {
 function init() {
   isMobileDevice = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 900;
   cacheDom();
-  clock = new THREE.Clock();
-  createScene();
   bindEvents();
+
+  if (typeof THREE === 'undefined') {
+    dom.playButton.disabled = true;
+    dom.playButton.textContent = 'Motore 3D non caricato';
+    return;
+  }
+
+  clock = new THREE.Clock();
+  lastSafePlayerPosition = new THREE.Vector3();
+  createScene();
   animate();
 }
 
@@ -1795,5 +1803,3 @@ function animate() {
 }
 
 init();
-style.css
-style.css
