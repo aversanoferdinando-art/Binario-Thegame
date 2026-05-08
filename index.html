@@ -28,70 +28,7 @@
         </p>
         <button id="playButton" type="button">Gioca</button>
         <p class="small-note">Ottimizzato per smartphone · Three.js r128 · GitHub Pages</p>
-      </div>
-    </div>
-
-    <div id="tutorialScreen" class="screen tutorial hidden">
-      <div class="menu-card tutorial-card">
-        <p class="eyebrow">Tutorial rapido</p>
-        <h2>Come giocare su smartphone</h2>
-        <div class="tutorial-grid">
-          <div>
-            <strong>1. Muoviti</strong>
-            <span>Usa il joystick a sinistra. Su Android/iPhone resta fisso nell’area sicura.</span>
-          </div>
-          <div>
-            <strong>2. Interagisci</strong>
-            <span>Tocca ENTRA/ESCI per salire sui mezzi o confermare i marker.</span>
-          </div>
-          <div>
-            <strong>3. Completa le fasi</strong>
-            <span>Il pulsante azione cambia nome: RIMUOVI, POSA o RINCALZA.</span>
-          </div>
-          <div>
-            <strong>4. Se ti perdi</strong>
-            <span>Apri HUD per obiettivo e progresso. CAM cambia visuale.</span>
-          </div>
-        </div>
-        <div class="tutorial-actions">
-          <button id="tutorialStartButton" type="button">Inizia missione</button>
-          <button id="tutorialSkipButton" class="secondary-button" type="button">Salta</button>
-        </div>
-      </div>
-    </div>
-
-    <aside id="hud" class="hud hidden">
-      <div class="hud-head">
-        <div>
-          <p class="hud-kicker">Missione</p>
-          <h2>Sostituzione rotaia</h2>
-        </div>
-        <button id="hudClose" type="button" aria-label="Chiudi HUD">×</button>
-      </div>
-
-      <div class="hud-block">
-        <div class="hud-label">FASE ATTUALE</div>
-        <div id="phaseName" class="hud-value">-</div>
-        <div id="phaseObjective" class="hud-note">-</div>
-        <div class="progress-line">
-          <span>Progresso</span>
-          <strong id="phaseProgressText">0%</strong>
-        </div>
-        <div class="bar">
-          <div id="phaseProgressBar" class="bar-fill"></div>
-        </div>
-      </div>
-
-      <div class="hud-block task-block">
-        <div class="hud-label">TASK</div>
-        <ul id="taskList" class="task-list">
-          <li data-step="0">Ispezione</li>
-          <li data-step="1">Preparazione</li>
-          <li data-step="2">Rimozione rotaia</li>
-          <li data-step="3">Posa rotaia</li>
-          <li data-step="4">Fissaggio</li>
-          <li data-step="5">Rincalzatura</li>
-          <li data-step="6">Controllo finale</li>
+@@ -95,52 +94,51 @@
         </ul>
       </div>
 
@@ -118,12 +55,14 @@
 
     <div id="mobileControls" class="mobile-controls hidden">
       <div id="touchStick" class="touch-stick">
+      <div id="touchStick" class="touch-stick" aria-label="Joystick movimento">
         <div id="touchKnob" class="touch-knob"></div>
       </div>
 
       <div class="mobile-actions">
         <button id="mobileInteract" type="button">E</button>
         <button id="mobileInteract" type="button">ENTRA</button>
+        <button id="mobileInteract" type="button" aria-label="Interagisci o esci dal mezzo">ENTRA</button>
         <button id="mobileAction" type="button">AZIONE</button>
         <button id="mobileCamera" type="button">CAM</button>
         <button id="mobileMenu" type="button">MENU</button>
