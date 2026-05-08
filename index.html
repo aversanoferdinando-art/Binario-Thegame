@@ -2,7 +2,6 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Binario - The Game</title>
   <link rel="stylesheet" href="style.css" />
@@ -117,13 +116,12 @@
     <button id="hudToggle" class="hud-toggle hidden" type="button">HUD</button>
 
     <div id="mobileControls" class="mobile-controls hidden">
-      <div id="touchStick" class="touch-stick">
+      <div id="touchStick" class="touch-stick" aria-label="Joystick movimento">
         <div id="touchKnob" class="touch-knob"></div>
       </div>
 
       <div class="mobile-actions">
-        <button id="mobileInteract" type="button">E</button>
-        <button id="mobileInteract" type="button">ENTRA</button>
+        <button id="mobileInteract" type="button" aria-label="Interagisci o esci dal mezzo">ENTRA</button>
         <button id="mobileAction" type="button">AZIONE</button>
         <button id="mobileCamera" type="button">CAM</button>
         <button id="mobileMenu" type="button">MENU</button>
