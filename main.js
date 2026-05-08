@@ -1360,7 +1360,36 @@ function bindEvents() {
 
 function setupMobileControls() {
   const maxDistance = isMobileDevice ? 48 : 42;
-  function resetStick() {
+
+  function updateStickFromPointer(event) {
+    const rect = dom.touchStick.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = event.clientX - centerX;
+    const dy = event.clientY - centerY;
+    const rawDistance = Math.sqrt(dx * dx + dy * dy);
+    const distance = Math.min(maxDistance, rawDistance);
+    const angle = Math.atan2(dy, dx);
+    const knobX = rawDistance > 0 ? Math.cos(angle) * distance : 0;
+    const knobY = rawDistance > 0 ? Math.sin(angle) * distance : 0;
+
+    touchInput.x = knobX / maxDistance;
+    touchInput.y = knobY / maxDistance;
+    dom.touchKnob.style.transform = 'translate(calc(-50% + ' + knobX + 'px), calc(-50% + ' + knobY + 'px))';
+  }
+
+  function resetStick(event) {
+    if (event && touchInput.pointerId !== null && event.pointerId !== touchInput.pointerId) return;
+
+    if (
+      event &&
+      touchInput.pointerId !== null &&
+      dom.touchStick.hasPointerCapture &&
+      dom.touchStick.hasPointerCapture(touchInput.pointerId)
+    ) {
+      dom.touchStick.releasePointerCapture(touchInput.pointerId);
+    }
+
     touchInput.active = false;
     touchInput.pointerId = null;
     touchInput.x = 0;
@@ -1370,33 +1399,25 @@ function setupMobileControls() {
 
   dom.touchStick.addEventListener('pointerdown', function (event) {
     event.preventDefault();
+    if (touchInput.active && event.pointerId !== touchInput.pointerId) return;
+
     touchInput.active = true;
     touchInput.pointerId = event.pointerId;
     touchInput.startX = event.clientX;
     touchInput.startY = event.clientY;
-    dom.touchStick.setPointerCapture(event.pointerId);
+    if (dom.touchStick.setPointerCapture) dom.touchStick.setPointerCapture(event.pointerId);
+    updateStickFromPointer(event);
   });
 
   dom.touchStick.addEventListener('pointermove', function (event) {
     if (!touchInput.active || event.pointerId !== touchInput.pointerId) return;
-
-    const dx = event.clientX - touchInput.startX;
-    const dy = event.clientY - touchInput.startY;
-    const distance = Math.min(maxDistance, Math.sqrt(dx * dx + dy * dy));
-    const angle = Math.atan2(dy, dx);
-    const knobX = Math.cos(angle) * distance;
-    const knobY = Math.sin(angle) * distance;
-
-    touchInput.x = knobX / maxDistance;
-    touchInput.y = knobY / maxDistance;
-    dom.touchKnob.style.transform = 'translate(calc(-50% + ' + knobX + 'px), calc(-50% + ' + knobY + 'px))';
+    event.preventDefault();
+    updateStickFromPointer(event);
   });
 
   dom.touchStick.addEventListener('pointerup', resetStick);
   dom.touchStick.addEventListener('pointercancel', resetStick);
   dom.touchStick.addEventListener('lostpointercapture', resetStick);
-
-  dom.touchStick.addEventListener('pointerleave', resetStick);
 
   bindMobileButton(dom.mobileInteract, function () { workPhaseManager.handleInteract(); });
   bindMobileButton(dom.mobileAction, function () {
