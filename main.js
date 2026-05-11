@@ -87,7 +87,7 @@ const avatarOptions = {
   suit: 'blue',
   helmet: 'yellow',
   skin: 'warm',
-  name: 'Caposquadra'
+  name: 'Capocantiere'
 };
 
 const avatarPalette = {
@@ -109,7 +109,7 @@ const avatarPalette = {
 };
 
 const powerUp = {
-  name: 'Turbo Focus',
+  name: 'Turbo Contract',
   collected: false,
   active: false,
   duration: 12,
@@ -886,7 +886,7 @@ class WorkPhaseManager {
   constructor() {
     this.phaseIndex = 0;
     this.phaseProgress = 0;
-    this.message = 'Avvicinati al binario evidenziato per iniziare l’ispezione.';
+    this.message = 'Contratto CIFA aperto: raggiungi il marker giallo per validare il sopralluogo iniziale.';
 
     this.metrics = {
       railReplacementProgress: 0,
@@ -900,12 +900,12 @@ class WorkPhaseManager {
 
     this.phases = [
       {
-        name: 'ISPEZIONE INIZIALE',
-        objective: 'Raggiungi la zona evidenziata sul binario centrale.',
-        controls: 'Joystick/WASD: movimento · CAM/C: cambia visuale · HUD: pannello',
+        name: '01 · SOPRALLUOGO CONTRATTO',
+        objective: 'Raggiungi il punto giallo e trasforma il cantiere in una commessa attiva.',
+        controls: 'Joystick/WASD: muovi il capocantiere · CAM/C: cambia visuale · OPS: scheda contratto',
         onEnter: () => {
           workObjects.inspectionZone.setVisible(true);
-          this.setMessage('Zona ispezione evidenziata: entra nell’area gialla sul binario centrale.');
+          this.setMessage('Feed contratto aggiornato: entra nel marker giallo per aprire la commessa Evolution.');
         },
         update: () => {
           this.phaseProgress = workObjects.inspectionZone.contains(player.position) ? 100 : 0;
@@ -913,27 +913,27 @@ class WorkPhaseManager {
         }
       },
       {
-        name: 'PREPARAZIONE CANTIERE',
-        objective: 'Tocca ENTRA/E sul punto blu per attivare sicurezza, luci e indicatori.',
-        controls: 'Joystick/WASD: movimento · ENTRA/E: conferma punto lavoro',
+        name: '02 · SETUP AREA CIFA',
+        objective: 'Attiva recinzioni, fari e checkpoint: il cantiere deve sembrare vivo prima dei mezzi.',
+        controls: 'Joystick/WASD: raggiungi il marker · ENTRA/E: firma setup area',
         onEnter: () => {
           workObjects.inspectionZone.setVisible(false);
           workObjects.prepZone.setVisible(true);
-          this.setMessage('Prima di lavorare devi mettere in sicurezza il cantiere. Tocca ENTRA/E nel marker blu.');
+          this.setMessage('Prima milestone: firma il setup nel marker blu per accendere la scena da simulatore cantiere.');
         },
         update: () => {
           this.phaseProgress = this.metrics.safetyScore;
         }
       },
       {
-        name: 'SCAVO BALLAST CON ESCAVATORE',
-        objective: 'Sali sul piccolo escavatore, scava il cumulo e carica 5 benne nel camion.',
-        controls: 'ISO style: WASD cingoli · Q/E rotazione torretta · R/F braccio · T/G avambraccio · Z/X benna · Space/AZIONE scava/scarica',
+        name: '03 · DEMOLIZIONE E CARICO',
+        objective: 'Sali sull’escavatore, demolisci ballast e carica 5 benne: la commessa entra nel vivo.',
+        controls: 'Stile simulatore: WASD cingoli · Q/E torretta · R/F braccio · T/G avambraccio · Z/X benna · Space/AZIONE carico',
         onEnter: () => {
           workObjects.prepZone.setVisible(false);
           excavator.entryZone.setVisible(activeVehicle !== excavator);
           workObjects.dumpZone.setVisible(true);
-          this.setMessage('Modalità piccolo escavatore: usa i comandi idraulici per riempire la benna dal cumulo e scaricare nel camion.');
+          this.setMessage('Modalità escavatore CIFA: scava dal cumulo e scarica sul camion per completare la demolizione.');
         },
         update: () => {
           this.phaseProgress = this.metrics.excavationProgress;
@@ -942,16 +942,16 @@ class WorkPhaseManager {
         }
       },
       {
-        name: 'RIMOZIONE ROTAIA',
-        objective: 'Sali sul Vaiacar strada-rotaia e avvia il sollevamento della rotaia vecchia.',
-        controls: 'E: sali/scendi · Joystick/WASD: guida · AZIONE/Space: rimozione',
+        name: '04 · RECUPERO ASSET FERROVIARIO',
+        objective: 'Usa il Vaiacar come mezzo logistico e rimuovi la rotaia vecchia dalla tratta urbana.',
+        controls: 'ENTRA/E: cabina · Joystick/WASD: guida · AZIONE/Space: recupera asset',
         onEnter: () => {
           if (activeVehicle) exitVehicle();
           excavator.entryZone.setVisible(false);
           workObjects.dumpZone.setVisible(false);
           workObjects.oldRail.mesh.material.emissive.setHex(0x662200);
           loader.entryZone.setVisible(activeVehicle !== loader);
-          this.setMessage('Rotaia vecchia evidenziata. Avvicinati, tocca ENTRA e poi AZIONE.');
+          this.setMessage('Asset da recuperare evidenziato: entra nel Vaiacar e avvia la sequenza logistica.');
         },
         update: () => {
           this.phaseProgress = clamp(this.metrics.railReplacementProgress / 55 * 100, 0, 100);
@@ -959,13 +959,13 @@ class WorkPhaseManager {
         }
       },
       {
-        name: 'POSA ROTAIA NUOVA',
-        objective: 'Preleva la rotaia nuova dal deposito e posala sulle traverse.',
-        controls: 'Dentro il Vaiacar: AZIONE/Space avvia posa guidata',
+        name: '05 · CONSEGNA NUOVO MODULO',
+        objective: 'Trasporta il nuovo modulo rotaia dal deposito e posalo con una consegna guidata.',
+        controls: 'Dentro il Vaiacar: AZIONE/Space conferma consegna e posa guidata',
         onEnter: () => {
           loader.entryZone.setVisible(activeVehicle !== loader);
           workObjects.newRail.mesh.material.emissive.setHex(0x164e2b);
-          this.setMessage('Rotaia nuova pronta nel deposito. Tocca AZIONE mentre sei nel Vaiacar.');
+          this.setMessage('Modulo nuovo pronto in deposito: il feed contratto aspetta la consegna sulla linea.');
         },
         update: () => {
           this.phaseProgress = clamp((this.metrics.railReplacementProgress - 55) / 45 * 100, 0, 100);
@@ -973,14 +973,14 @@ class WorkPhaseManager {
         }
       },
       {
-        name: 'FISSAGGIO ROTAIA',
-        objective: 'Chiudi 6 punti di attacco evidenziati lungo la rotaia.',
-        controls: 'Joystick/WASD: movimento · ENTRA/E: fissa attacco',
+        name: '06 · MONTAGGIO ATTACCHI',
+        objective: 'Completa i marker di montaggio: ogni attacco chiuso aumenta il valore del contratto.',
+        controls: 'Joystick/WASD: pattuglia i marker · ENTRA/E: monta attacco',
         onEnter: () => {
           if (activeVehicle) exitVehicle();
           loader.entryZone.setVisible(false);
           fasteningPoints.forEach((zone) => zone.setVisible(true));
-          this.setMessage('Fissa la rotaia nuova: ogni marker completato diventa verde.');
+          this.setMessage('Montaggio manuale: chiudi tutti gli attacchi, i marker verdi sono milestone consegnate.');
         },
         update: () => {
           const completed = fasteningPoints.filter((zone) => zone.completed).length;
@@ -990,14 +990,14 @@ class WorkPhaseManager {
         }
       },
       {
-        name: 'RINCALZATURA BINARIO',
-        objective: 'Sali sulla rincalzatrice e completa almeno 8-10 cicli sulle traverse.',
-        controls: 'E: sali/scendi · Joystick su/giù: avanza · AZIONE/Space: rincalza',
+        name: '07 · COMPATTAZIONE DINAMICA',
+        objective: 'Porta la rincalzatrice sui marker e completa 8-10 cicli per stabilizzare la consegna.',
+        controls: 'ENTRA/E: cabina · Joystick su/giù: avanza · AZIONE/Space: compatta',
         onEnter: () => {
           fasteningPoints.forEach((zone) => zone.setVisible(false));
           tamper.entryZone.setVisible(activeVehicle !== tamper);
           tampingMarkers.forEach((zone, index) => zone.setVisible(index < 10));
-          this.setMessage('Rincalzatura: i martelli devono scendere, vibrare e compattare il ballast.');
+          this.setMessage('Compattazione dinamica: vibra e stabilizza il ballast per chiudere il contratto.');
         },
         update: () => {
           this.phaseProgress = this.metrics.tampingProgress;
@@ -1010,14 +1010,14 @@ class WorkPhaseManager {
         }
       },
       {
-        name: 'CONTROLLO FINALE',
-        objective: 'Verifica rotaia, fissaggio, compattazione, geometria e sicurezza.',
-        controls: 'CAM/C: cambia visuale · MENU/Esc: menu',
+        name: '08 · COLLAUDO E PAYOUT',
+        objective: 'Valida qualità, sicurezza e asset consegnati: quando tutto è verde sblocchi il payout.',
+        controls: 'CAM/C: visuale finale · MENU/Esc: feed contratti',
         onEnter: () => {
           if (activeVehicle) exitVehicle();
           tamper.entryZone.setVisible(false);
           tampingMarkers.forEach((zone) => zone.setVisible(false));
-          this.setMessage('Controllo finale: tutti i parametri devono essere sopra soglia.');
+          this.setMessage('Collaudo finale: porta ogni KPI sopra soglia e incassa la commessa Evolution.');
         },
         update: (delta) => {
           const m = this.metrics;
@@ -1040,7 +1040,7 @@ class WorkPhaseManager {
             m.ballastCompaction = smoothTowards(m.ballastCompaction, 88, 1.8, delta);
             showFinalScreen();
           } else {
-            this.setMessage('Soglie non raggiunte: completa le fasi precedenti.');
+            this.setMessage('Payout bloccato: completa le milestone mancanti e porta i KPI in verde.');
           }
         }
       }
@@ -1098,7 +1098,7 @@ class WorkPhaseManager {
         nearest.mesh.material.opacity = 0.28;
         addFasteningPlate(nearest.position);
         playTone(240, 0.07, 'square');
-        this.setMessage('Attacco chiuso. Passa al prossimo punto evidenziato.');
+        this.setMessage('Milestone montaggio registrata. Passa al prossimo punto evidenziato.');
       }
     }
   }
@@ -1106,7 +1106,7 @@ class WorkPhaseManager {
   handleAction() {
     if (this.phaseIndex === 2) {
       if (activeVehicle === excavator) excavator.operateBucket();
-      else this.setMessage('Devi prima salire sul piccolo escavatore: premi E vicino alla cabina.');
+      else this.setMessage('Serve l’escavatore per questa milestone: premi E vicino alla cabina.');
       return;
     }
 
@@ -1114,7 +1114,7 @@ class WorkPhaseManager {
       if (activeVehicle === loader) {
         if (!loader.sequence) loader.startRemoveSequence(workObjects.oldRail);
       } else {
-        this.setMessage('Devi prima salire sul Vaiacar: tocca ENTRA/E vicino al mezzo.');
+        this.setMessage('Serve il Vaiacar logistico: tocca ENTRA/E vicino al mezzo.');
       }
       return;
     }
@@ -1123,14 +1123,14 @@ class WorkPhaseManager {
       if (activeVehicle === loader) {
         if (!loader.sequence) loader.startPlaceSequence(workObjects.newRail);
       } else {
-        this.setMessage('Devi prima salire sul Vaiacar per posare la rotaia.');
+        this.setMessage('La consegna richiede il Vaiacar: entra in cabina per posare il modulo.');
       }
       return;
     }
 
     if (this.phaseIndex === 6) {
       if (activeVehicle === tamper) tamper.startCycle();
-      else this.setMessage('Devi prima salire sulla rincalzatrice: premi E vicino al mezzo.');
+      else this.setMessage('Serve la rincalzatrice per chiudere la compattazione dinamica.');
     }
   }
 
@@ -1837,7 +1837,7 @@ function getRegulationStatus() {
   if (workPhaseManager.phaseIndex === 7 && m.ballastCompaction < regulations.minimumBallastCompaction) warnings.push('compattazione sotto soglia');
   if (workPhaseManager.phaseIndex === 7 && m.trackGeometryQuality < regulations.minimumTrackGeometry) warnings.push('geometria sotto soglia');
 
-  return warnings.length ? 'Verifica normativa: ' + warnings.join(' · ') : 'Normativa OK: ' + regulations.notes[workPhaseManager.phaseIndex % regulations.notes.length];
+  return warnings.length ? 'QA contratto: ' + warnings.join(' · ') : 'QA verde: ' + regulations.notes[workPhaseManager.phaseIndex % regulations.notes.length];
 }
 
 function createWeatherSystem() {
@@ -1985,7 +1985,7 @@ function updatePowerUp(delta) {
       powerUp.collected = true;
       powerUpOrb.visible = false;
       playTone(620, 0.08, 'sine');
-      if (workPhaseManager) workPhaseManager.setMessage('Hai raccolto Turbo Focus. Premi F o BOOST per attivare il power-up.');
+      if (workPhaseManager) workPhaseManager.setMessage('Hai raccolto Turbo Contract. Premi F o BOOST per attivare il power-up.');
     }
   }
 
@@ -1999,7 +1999,7 @@ function updatePowerUp(delta) {
       player.group.traverse((child) => {
         if (child.isMesh && child.material && child.material.emissive) child.material.emissive.setHex(0x000000);
       });
-      if (workPhaseManager) workPhaseManager.setMessage('Turbo Focus esaurito. Continua la missione con ritmo normale.');
+      if (workPhaseManager) workPhaseManager.setMessage('Turbo Contract esaurito. Continua la missione con ritmo normale.');
     }
   }
 
@@ -2389,7 +2389,7 @@ function updateHUD() {
   dom.controlsText.textContent = phase.controls;
   dom.messageText.textContent = workPhaseManager.message;
   if (dom.weatherText) dom.weatherText.textContent = weather.presets[weather.index].name + ' · vento ' + weather.presets[weather.index].wind.toFixed(1) + ' m/s';
-  if (dom.trackStateText) dom.trackStateText.textContent = 'scartamento Δ ' + trackState.geometryMm.toFixed(1) + ' mm · sghembo ' + trackState.twistMm.toFixed(1) + ' mm';
+  if (dom.trackStateText) dom.trackStateText.textContent = 'asset Δ ' + trackState.geometryMm.toFixed(1) + ' mm · twist ' + trackState.twistMm.toFixed(1) + ' mm';
   if (dom.regulationText) dom.regulationText.textContent = getRegulationStatus();
   if (dom.speedText) {
     const moving = activeVehicle ? activeVehicle.speed : player.speed;
@@ -2413,13 +2413,13 @@ function updatePowerUpHud() {
   dom.powerUpButton.disabled = !powerUp.collected || powerUp.active || powerUp.cooldown > 0;
 
   if (!powerUp.collected) {
-    dom.powerUpStatus.textContent = 'Cerca il nucleo azzurro vicino alla preparazione cantiere.';
+    dom.powerUpStatus.textContent = 'Cerca il boost azzurro per accelerare la commessa.';
   } else if (powerUp.active) {
     dom.powerUpStatus.textContent = 'Attivo: ' + powerUp.remaining.toFixed(1) + 's · velocità x' + powerUp.speedMultiplier;
   } else if (powerUp.cooldown > 0) {
     dom.powerUpStatus.textContent = 'Ricarica: ' + powerUp.cooldown.toFixed(1) + 's';
   } else {
-    dom.powerUpStatus.textContent = 'Pronto: premi F o BOOST per attivarlo.';
+    dom.powerUpStatus.textContent = 'Pronto: premi F o BOOST per modalità arcade.';
   }
 }
 
