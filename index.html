@@ -80,8 +80,8 @@
             <span>Tocca ENTRA/ESCI per salire sui mezzi o confermare i marker.</span>
           </div>
           <div>
-            <strong>3. Completa le fasi</strong>
-            <span>Il pulsante azione cambia nome: RIMUOVI, POSA o RINCALZA.</span>
+            <strong>3. Mezzi pesanti</strong>
+            <span>Guida escavatore, caricatore e rincalzatrice: il pulsante cambia in SCAVA, POSA o RINCALZA.</span>
           </div>
           <div>
             <strong>4. Power-up</strong>
@@ -122,11 +122,12 @@
         <ul id="taskList" class="task-list">
           <li data-step="0">Ispezione</li>
           <li data-step="1">Preparazione</li>
-          <li data-step="2">Rimozione rotaia</li>
-          <li data-step="3">Posa rotaia</li>
-          <li data-step="4">Fissaggio</li>
-          <li data-step="5">Rincalzatura</li>
-          <li data-step="6">Controllo finale</li>
+          <li data-step="2">Scavo ballast</li>
+          <li data-step="3">Rimozione rotaia</li>
+          <li data-step="4">Posa rotaia</li>
+          <li data-step="5">Fissaggio</li>
+          <li data-step="6">Rincalzatura</li>
+          <li data-step="7">Controllo finale</li>
         </ul>
       </div>
 
@@ -140,6 +141,7 @@
       </div>
 
       <div class="hud-block metrics-grid">
+        <div><span>Scavo</span><strong id="excavationProgressText">0%</strong></div>
         <div><span>Rotaia</span><strong id="railProgressText">0%</strong></div>
         <div><span>Fissaggio</span><strong id="fasteningProgressText">0%</strong></div>
         <div><span>Rincalzatura</span><strong id="tampingProgressText">0%</strong></div>
