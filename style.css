@@ -384,6 +384,35 @@ button:active {
   gap: 6px;
 }
 
+.simulator-status {
+  display: grid;
+  gap: 7px;
+}
+
+.simulator-status div {
+  padding: 8px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(30, 41, 59, 0.66));
+  border: 1px solid rgba(125, 211, 252, 0.14);
+}
+
+.simulator-status span {
+  display: block;
+  color: #93c5fd;
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.simulator-status strong {
+  display: block;
+  margin-top: 3px;
+  color: #e0f2fe;
+  font-size: 0.74rem;
+  line-height: 1.3;
+}
+
 .metrics-grid div {
   padding: 7px;
   border-radius: 10px;

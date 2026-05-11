@@ -12,7 +12,7 @@
       <div class="splash-panel">
         <p class="splash-kicker">Railway worksite simulator</p>
         <h1>Binario<br><span>The Game</span></h1>
-        <p>Simulazione dinamica di armamento ferroviario: rotaie, fissaggi, rincalzatura e cantiere.</p>
+        <p>Simulazione dinamica di armamento ferroviario: Vaiacar, rincalzatrice, piccolo escavatore, meteo e regole di cantiere.</p>
         <button id="splashEnterButton" type="button">Entra</button>
       </div>
     </div>
@@ -22,8 +22,8 @@
         <p class="eyebrow">Simulatore didattico 3D</p>
         <h1>Cantiere di armamento ferroviario</h1>
         <p class="mission-text">
-          Metti in sicurezza il cantiere, rimuovi la rotaia vecchia, posa la rotaia nuova,
-          completa i fissaggi e rincalza il binario fino a raggiungere la qualità richiesta.
+          Metti in sicurezza il cantiere, governa piccolo escavatore, Vaiacar strada-rotaia e rincalzatrice,
+          carica e posa rotaie, completa fissaggi e rincalza il binario rispettando la normativa simulata.
         </p>
         <div class="customizer-card" aria-label="Personalizzazione personaggio">
           <div class="customizer-head">
@@ -80,8 +80,8 @@
             <span>Tocca ENTRA/ESCI per salire sui mezzi o confermare i marker.</span>
           </div>
           <div>
-            <strong>3. Mezzi pesanti</strong>
-            <span>Guida escavatore, caricatore e rincalzatrice: il pulsante cambia in SCAVA, POSA o RINCALZA.</span>
+            <strong>3. Tre macchine</strong>
+            <span>Guida piccolo escavatore, Vaiacar e rincalzatrice: il pulsante cambia in SCAVA, POSA o RINCALZA.</span>
           </div>
           <div>
             <strong>4. Power-up</strong>
@@ -148,6 +148,13 @@
         <div><span>Geometria</span><strong id="qualityText">0%</strong></div>
         <div><span>Ballast</span><strong id="compactionText">0%</strong></div>
         <div><span>Sicurezza</span><strong id="safetyText">0%</strong></div>
+        <div><span>Velocità</span><strong id="speedText">0 km/h</strong></div>
+      </div>
+
+      <div class="hud-block simulator-status">
+        <div><span>Meteo</span><strong id="weatherText">Sereno</strong></div>
+        <div><span>Binario dinamico</span><strong id="trackStateText">-</strong></div>
+        <div><span>Normativa</span><strong id="regulationText">-</strong></div>
       </div>
 
       <div class="hud-block controls-block">
