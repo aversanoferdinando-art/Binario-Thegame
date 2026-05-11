@@ -16,6 +16,7 @@ let gameStarted = false;
 let isMobileDevice = false;
 let lastSafePlayerPosition;
 let lastMobileButtonTime = 0;
+let powerUpOrb = null;
 
 const keys = Object.create(null);
 const colliders = [];
@@ -24,6 +25,7 @@ const fasteningPoints = [];
 const tampingMarkers = [];
 const constructionLights = [];
 const compactedPatches = [];
+const powerUpParticles = [];
 const workObjects = {};
 const materials = {};
 const dom = {};
@@ -35,6 +37,42 @@ const touchInput = {
   startY: 0,
   x: 0,
   y: 0
+};
+
+const avatarOptions = {
+  suit: 'blue',
+  helmet: 'yellow',
+  skin: 'warm',
+  name: 'Caposquadra'
+};
+
+const avatarPalette = {
+  suit: {
+    blue: 0x2563eb,
+    orange: 0xf97316,
+    black: 0x111827
+  },
+  helmet: {
+    yellow: 0xfacc15,
+    white: 0xf8fafc,
+    red: 0xef4444
+  },
+  skin: {
+    warm: 0xffd3a3,
+    deep: 0x8d5524,
+    light: 0xf8dcc2
+  }
+};
+
+const powerUp = {
+  name: 'Turbo Focus',
+  collected: false,
+  active: false,
+  duration: 12,
+  remaining: 0,
+  cooldown: 0,
+  speedMultiplier: 1.75,
+  workMultiplier: 1.35
 };
 
 const world = {
@@ -290,7 +328,7 @@ class RailRoadLoader {
   }
 
   animateRailRemoval(delta) {
-    this.sequenceTime += delta;
+    this.sequenceTime += delta * (powerUp.active ? powerUp.workMultiplier : 1);
     const t = this.sequenceTime;
     const rail = this.carriedRail;
 
@@ -329,7 +367,7 @@ class RailRoadLoader {
   }
 
   animateRailPlacement(delta) {
-    this.sequenceTime += delta;
+    this.sequenceTime += delta * (powerUp.active ? powerUp.workMultiplier : 1);
     const t = this.sequenceTime;
     const rail = this.carriedRail;
 
@@ -508,7 +546,7 @@ class TampingMachine {
   }
 
   updateCycle(delta) {
-    this.cycleTime += delta;
+    this.cycleTime += delta * (powerUp.active ? powerUp.workMultiplier : 1);
     const t = this.cycleTime;
     let headY = 0.85;
     let vibration = 0;
@@ -520,7 +558,7 @@ class TampingMachine {
       headY = 0.27;
       vibration = Math.sin(t * 84) * 0.045;
       dustOpacity = 0.65;
-      workPhaseManager.metrics.ballastCompaction = Math.min(100, workPhaseManager.metrics.ballastCompaction + delta * 3.5);
+      workPhaseManager.metrics.ballastCompaction = Math.min(100, workPhaseManager.metrics.ballastCompaction + delta * 3.5 * (powerUp.active ? powerUp.workMultiplier : 1));
     } else if (t < 3.55) {
       headY = 0.27 + ((t - 2.7) / 0.85) * 0.58;
       dustOpacity = 0.24;
@@ -889,9 +927,17 @@ function cacheDom() {
   dom.touchKnob = document.getElementById('touchKnob');
   dom.mobileInteract = document.getElementById('mobileInteract');
   dom.mobileAction = document.getElementById('mobileAction');
+  dom.mobilePower = document.getElementById('mobilePower');
   dom.mobileCamera = document.getElementById('mobileCamera');
   dom.mobileMenu = document.getElementById('mobileMenu');
   dom.hudToggle = document.getElementById('hudToggle');
+  dom.avatarName = document.getElementById('avatarName');
+  dom.avatarSuit = document.getElementById('avatarSuit');
+  dom.avatarHelmet = document.getElementById('avatarHelmet');
+  dom.avatarSkin = document.getElementById('avatarSkin');
+  dom.powerUpName = document.getElementById('powerUpName');
+  dom.powerUpStatus = document.getElementById('powerUpStatus');
+  dom.powerUpButton = document.getElementById('powerUpButton');
 }
 
 function createScene() {
@@ -918,6 +964,7 @@ function createScene() {
   createVegetation();
   createWorkers();
   createPlayer();
+  createPowerUpOrb();
   createRailRoadLoader();
   createTampingMachine();
   createInteractionAndWorkZones();
@@ -957,6 +1004,9 @@ function createMaterials() {
   materials.roof = new THREE.MeshLambertMaterial({ color: 0x7c2d12 });
   materials.woodStack = new THREE.MeshLambertMaterial({ color: 0x5c3b24 });
   materials.workerOrange = new THREE.MeshLambertMaterial({ color: 0xf97316 });
+  materials.skin = new THREE.MeshLambertMaterial({ color: avatarPalette.skin[avatarOptions.skin] });
+  materials.powerCore = new THREE.MeshStandardMaterial({ color: 0x67e8f9, emissive: 0x155e75, roughness: 0.18, metalness: 0.22, transparent: true, opacity: 0.92 });
+  materials.powerRing = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.36, side: THREE.DoubleSide });
 }
 
 function createLights() {
@@ -1281,21 +1331,62 @@ function createPlayer() {
   const group = new THREE.Group();
   group.position.set(-3.8, 0, -42);
 
-  const body = createCylinder(0.28, 0.33, 1.1, 18, new THREE.MeshLambertMaterial({ color: 0x2563eb }), 0, 1.0, 0);
-  const vest = createBox(0.5, 0.45, 0.08, materials.workerOrange, 0, 1.16, -0.25);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 18), new THREE.MeshLambertMaterial({ color: 0xffd3a3 }));
+  const suitMaterial = new THREE.MeshLambertMaterial({ color: avatarPalette.suit[avatarOptions.suit] });
+  const helmetMaterial = new THREE.MeshLambertMaterial({ color: avatarPalette.helmet[avatarOptions.helmet] });
+  const skinMaterial = new THREE.MeshLambertMaterial({ color: avatarPalette.skin[avatarOptions.skin] });
+  const trimMaterial = new THREE.MeshLambertMaterial({ color: 0xe2e8f0 });
+  const bootMaterial = new THREE.MeshLambertMaterial({ color: 0x0f172a });
+
+  const torso = createCylinder(0.28, 0.36, 0.9, 18, suitMaterial, 0, 1.14, 0);
+  torso.name = 'avatar-suit';
+
+  const vestFront = createBox(0.52, 0.44, 0.055, materials.workerOrange, 0, 1.18, -0.30);
+  const vestBack = createBox(0.52, 0.44, 0.055, materials.workerOrange, 0, 1.18, 0.30);
+  const reflectiveA = createBox(0.08, 0.5, 0.065, trimMaterial, -0.13, 1.2, -0.335);
+  const reflectiveB = createBox(0.08, 0.5, 0.065, trimMaterial, 0.13, 1.2, -0.335);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 18), skinMaterial);
+  head.name = 'avatar-skin';
   head.position.set(0, 1.7, 0);
   head.castShadow = true;
 
-  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.27, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), materials.machineYellow);
-  helmet.position.set(0, 1.8, 0);
+  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.27, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), helmetMaterial);
+  helmet.name = 'avatar-helmet';
+  helmet.position.set(0, 1.82, 0);
   helmet.castShadow = true;
 
-  group.add(body, vest, head, helmet);
+  const visor = createBox(0.34, 0.045, 0.18, helmetMaterial, 0, 1.78, -0.22);
+  visor.name = 'avatar-helmet';
+
+  const leftArm = createCylinder(0.075, 0.085, 0.72, 12, suitMaterial, -0.36, 1.15, 0, { z: -0.18 });
+  const rightArm = createCylinder(0.075, 0.085, 0.72, 12, suitMaterial, 0.36, 1.15, 0, { z: 0.18 });
+  leftArm.name = 'avatar-suit';
+  rightArm.name = 'avatar-suit';
+
+  const leftLeg = createBox(0.16, 0.7, 0.18, suitMaterial, -0.12, 0.46, 0);
+  const rightLeg = createBox(0.16, 0.7, 0.18, suitMaterial, 0.12, 0.46, 0);
+  leftLeg.name = 'avatar-suit';
+  rightLeg.name = 'avatar-suit';
+
+  const leftBoot = createBox(0.2, 0.13, 0.26, bootMaterial, -0.12, 0.1, -0.035);
+  const rightBoot = createBox(0.2, 0.13, 0.26, bootMaterial, 0.12, 0.1, -0.035);
+
+  const namePlateCanvas = document.createElement('canvas');
+  namePlateCanvas.width = 256;
+  namePlateCanvas.height = 64;
+  const namePlateTexture = new THREE.CanvasTexture(namePlateCanvas);
+  const namePlate = new THREE.Sprite(new THREE.SpriteMaterial({ map: namePlateTexture, transparent: true }));
+  namePlate.position.set(0, 2.32, 0);
+  namePlate.scale.set(1.65, 0.42, 1);
+  namePlate.userData.canvas = namePlateCanvas;
+  namePlate.userData.texture = namePlateTexture;
+
+  group.add(torso, vestFront, vestBack, reflectiveA, reflectiveB, head, helmet, visor, leftArm, rightArm, leftLeg, rightLeg, leftBoot, rightBoot, namePlate);
   scene.add(group);
 
   player = {
     group,
+    namePlate,
     position: group.position,
     velocity: new THREE.Vector3(),
     baseSpeed: 7.0 * 1.4,
@@ -1306,7 +1397,55 @@ function createPlayer() {
     walkBob: 0
   };
 
+  applyAvatarCustomization();
   lastSafePlayerPosition.copy(player.position);
+}
+
+function applyAvatarCustomization() {
+  if (!player) return;
+
+  avatarOptions.name = (dom.avatarName && dom.avatarName.value.trim()) || 'Caposquadra';
+  avatarOptions.suit = dom.avatarSuit ? dom.avatarSuit.value : avatarOptions.suit;
+  avatarOptions.helmet = dom.avatarHelmet ? dom.avatarHelmet.value : avatarOptions.helmet;
+  avatarOptions.skin = dom.avatarSkin ? dom.avatarSkin.value : avatarOptions.skin;
+
+  player.group.traverse((child) => {
+    if (!child.isMesh || !child.material || !child.material.color) return;
+    if (child.name === 'avatar-suit') child.material.color.setHex(avatarPalette.suit[avatarOptions.suit]);
+    if (child.name === 'avatar-helmet') child.material.color.setHex(avatarPalette.helmet[avatarOptions.helmet]);
+    if (child.name === 'avatar-skin') child.material.color.setHex(avatarPalette.skin[avatarOptions.skin]);
+  });
+
+  if (player.namePlate && player.namePlate.userData.canvas) {
+    const canvas = player.namePlate.userData.canvas;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.72)';
+    ctx.strokeStyle = 'rgba(125, 211, 252, 0.9)';
+    ctx.lineWidth = 5;
+    if (ctx.roundRect) {
+      ctx.roundRect(8, 8, 240, 48, 18);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(26, 8);
+      ctx.lineTo(230, 8);
+      ctx.quadraticCurveTo(248, 8, 248, 26);
+      ctx.lineTo(248, 46);
+      ctx.quadraticCurveTo(248, 56, 230, 56);
+      ctx.lineTo(26, 56);
+      ctx.quadraticCurveTo(8, 56, 8, 46);
+      ctx.lineTo(8, 26);
+      ctx.quadraticCurveTo(8, 8, 26, 8);
+    }
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '900 24px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(avatarOptions.name.slice(0, 16), 128, 33);
+    player.namePlate.userData.texture.needsUpdate = true;
+  }
 }
 
 function createInteractionAndWorkZones() {
@@ -1346,6 +1485,86 @@ function compactBallastAt(z) {
   compactedPatches.push(patch);
 }
 
+function createPowerUpOrb() {
+  const group = new THREE.Group();
+  group.position.set(-5.6, 1.15, -33.5);
+
+  const core = createSphere(0.38, materials.powerCore, 0, 0, 0, { x: 1, y: 1, z: 1 });
+  const ringA = new THREE.Mesh(new THREE.RingGeometry(0.58, 0.72, isMobileDevice ? 28 : 48), materials.powerRing);
+  const ringB = new THREE.Mesh(new THREE.RingGeometry(0.82, 0.92, isMobileDevice ? 28 : 48), materials.powerRing.clone());
+  ringA.rotation.x = Math.PI / 2;
+  ringB.rotation.y = Math.PI / 2;
+  ringB.material.opacity = 0.22;
+  group.add(core, ringA, ringB);
+
+  const light = new THREE.PointLight(0x38bdf8, isMobileDevice ? 0.9 : 1.35, 7);
+  light.position.set(0, 0.2, 0);
+  group.add(light);
+
+  for (let i = 0; i < (isMobileDevice ? 10 : 18); i++) {
+    const particle = createSphere(0.045, materials.powerCore.clone(), 0, 0, 0, { x: 1, y: 1, z: 1 });
+    particle.material.opacity = 0.54;
+    particle.userData.angle = (Math.PI * 2 * i) / (isMobileDevice ? 10 : 18);
+    particle.userData.radius = 0.85 + (i % 3) * 0.22;
+    particle.userData.speed = 0.8 + (i % 5) * 0.18;
+    group.add(particle);
+    powerUpParticles.push(particle);
+  }
+
+  scene.add(group);
+  powerUpOrb = group;
+}
+
+function activatePowerUp() {
+  if (!powerUp.collected || powerUp.active || powerUp.cooldown > 0) return;
+  powerUp.active = true;
+  powerUp.remaining = powerUp.duration;
+  powerUp.cooldown = powerUp.duration + 8;
+  playTone(740, 0.08, 'triangle');
+  setTimeout(() => playTone(990, 0.1, 'triangle'), 90);
+  if (workPhaseManager) {
+    workPhaseManager.setMessage('POWER-UP attivo: velocità aumentata, feedback luminoso e lavorazioni più rapide per 12 secondi.');
+  }
+}
+
+function updatePowerUp(delta) {
+  if (!powerUpOrb) return;
+
+  const time = performance.now() * 0.001;
+  if (!powerUp.collected) {
+    powerUpOrb.rotation.y += delta * 1.6;
+    powerUpOrb.rotation.z -= delta * 0.55;
+    powerUpOrb.position.y = 1.15 + Math.sin(time * 2.8) * 0.18;
+    powerUpParticles.forEach((particle) => {
+      const angle = particle.userData.angle + time * particle.userData.speed;
+      particle.position.set(Math.cos(angle) * particle.userData.radius, Math.sin(time * 3 + angle) * 0.18, Math.sin(angle) * particle.userData.radius);
+    });
+
+    if (gameStarted && !activeVehicle && distanceXZ(player.position, powerUpOrb.position) < 2.0) {
+      powerUp.collected = true;
+      powerUpOrb.visible = false;
+      playTone(620, 0.08, 'sine');
+      if (workPhaseManager) workPhaseManager.setMessage('Hai raccolto Turbo Focus. Premi F o BOOST per attivare il power-up.');
+    }
+  }
+
+  if (powerUp.active) {
+    powerUp.remaining = Math.max(0, powerUp.remaining - delta);
+    player.group.traverse((child) => {
+      if (child.isMesh && child.material && child.material.emissive) child.material.emissive.setHex(0x082f49);
+    });
+    if (powerUp.remaining <= 0) {
+      powerUp.active = false;
+      player.group.traverse((child) => {
+        if (child.isMesh && child.material && child.material.emissive) child.material.emissive.setHex(0x000000);
+      });
+      if (workPhaseManager) workPhaseManager.setMessage('Turbo Focus esaurito. Continua la missione con ritmo normale.');
+    }
+  }
+
+  if (powerUp.cooldown > 0) powerUp.cooldown = Math.max(0, powerUp.cooldown - delta);
+}
+
 function bindEvents() {
   window.addEventListener('resize', onWindowResize);
   window.addEventListener('keydown', onKeyDown);
@@ -1363,6 +1582,10 @@ function bindEvents() {
   });
   dom.hudClose.addEventListener('click', function () { dom.hud.classList.add('mobile-collapsed'); });
   dom.helpButton.addEventListener('click', focusCurrentObjective);
+  dom.powerUpButton.addEventListener('click', activatePowerUp);
+  [dom.avatarName, dom.avatarSuit, dom.avatarHelmet, dom.avatarSkin].forEach((control) => {
+    if (control) control.addEventListener('input', applyAvatarCustomization);
+  });
   setupMobileControls();
 }
 
@@ -1407,6 +1630,7 @@ function setupMobileControls() {
   dom.touchStick.addEventListener('pointerleave', resetStick);
 
   bindMobileButton(dom.mobileInteract, function () { workPhaseManager.handleInteract(); });
+  bindMobileButton(dom.mobilePower, activatePowerUp);
   bindMobileButton(dom.mobileAction, function () {
     if (workPhaseManager.phaseIndex === 1 || workPhaseManager.phaseIndex === 4) {
       workPhaseManager.handleInteract();
@@ -1543,6 +1767,11 @@ function onKeyDown(event) {
     workPhaseManager.handleInteract();
   }
 
+  if (event.code === 'KeyF') {
+    event.preventDefault();
+    activatePowerUp();
+  }
+
   if (event.code === 'Space') {
     event.preventDefault();
     if (activeVehicle === loader && (workPhaseManager.phaseIndex === 2 || workPhaseManager.phaseIndex === 3)) {
@@ -1612,7 +1841,7 @@ function updatePlayer(delta) {
 
   if (input.lengthSq() > 0) input.normalize();
 
-  const speed = player.baseSpeed * (keys.ShiftLeft || keys.ShiftRight ? player.sprintMultiplier : 1);
+  const speed = player.baseSpeed * (powerUp.active ? powerUp.speedMultiplier : 1) * (keys.ShiftLeft || keys.ShiftRight ? player.sprintMultiplier : 1);
   const targetVelocity = input.multiplyScalar(speed);
   const rate = targetVelocity.lengthSq() > 0 ? player.acceleration : player.deceleration;
 
@@ -1706,6 +1935,7 @@ function updateHUD() {
 
   dom.controlsText.textContent = phase.controls;
   dom.messageText.textContent = workPhaseManager.message;
+  updatePowerUpHud();
   updateMobileButtons();
 
   const items = dom.taskList ? dom.taskList.querySelectorAll('li') : [];
@@ -1714,6 +1944,23 @@ function updateHUD() {
     item.classList.toggle('done', step < workPhaseManager.phaseIndex);
     item.classList.toggle('active', step === workPhaseManager.phaseIndex);
   });
+}
+
+function updatePowerUpHud() {
+  if (!dom.powerUpStatus || !dom.powerUpButton) return;
+
+  dom.powerUpName.textContent = powerUp.name;
+  dom.powerUpButton.disabled = !powerUp.collected || powerUp.active || powerUp.cooldown > 0;
+
+  if (!powerUp.collected) {
+    dom.powerUpStatus.textContent = 'Cerca il nucleo azzurro vicino alla preparazione cantiere.';
+  } else if (powerUp.active) {
+    dom.powerUpStatus.textContent = 'Attivo: ' + powerUp.remaining.toFixed(1) + 's · velocità x' + powerUp.speedMultiplier;
+  } else if (powerUp.cooldown > 0) {
+    dom.powerUpStatus.textContent = 'Ricarica: ' + powerUp.cooldown.toFixed(1) + 's';
+  } else {
+    dom.powerUpStatus.textContent = 'Pronto: premi F o BOOST per attivarlo.';
+  }
 }
 
 function updateMobileButtons() {
@@ -1795,6 +2042,7 @@ function animate() {
   const delta = Math.min(clock.getDelta(), isMobileDevice ? 0.04 : 0.05);
   updatePlayer(delta);
   updateVehicles(delta);
+  updatePowerUp(delta);
   updateWorkPhases(delta);
   updateInteractionHints(delta);
   updateHUD();

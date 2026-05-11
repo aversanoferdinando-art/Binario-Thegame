@@ -152,6 +152,95 @@ button:active {
   transform: scale(0.97);
 }
 
+.customizer-card {
+  margin: 18px 0 20px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(15, 23, 42, 0.72));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.customizer-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.customizer-head strong {
+  font-size: 1rem;
+}
+
+.customizer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.customizer-card label {
+  display: grid;
+  gap: 6px;
+  color: #bfdbfe;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.customizer-card input,
+.customizer-card select {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 14px;
+  padding: 11px 12px;
+  color: #f8fafc;
+  background: rgba(2, 6, 23, 0.62);
+  outline: none;
+}
+
+.powerup-panel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border-color: rgba(56, 189, 248, 0.28);
+  background: radial-gradient(circle at 20% 0%, rgba(56, 189, 248, 0.22), rgba(15, 23, 42, 0.72));
+}
+
+.powerup-panel strong,
+.powerup-panel span {
+  display: block;
+}
+
+.powerup-panel strong {
+  color: #e0f2fe;
+  font-size: 0.92rem;
+}
+
+.powerup-panel span {
+  margin-top: 3px;
+  color: #bae6fd;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+#powerUpButton {
+  min-width: 82px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  color: #082f49;
+  background: linear-gradient(135deg, #67e8f9, #38bdf8 48%, #818cf8);
+  box-shadow: 0 12px 28px rgba(56, 189, 248, 0.28);
+}
+
+#powerUpButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  filter: grayscale(0.45);
+  box-shadow: none;
+}
+
 .hud {
   position: fixed;
   top: 14px;
@@ -647,6 +736,10 @@ button:active {
 @media (max-width: 900px) {
   .screen {
     padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  }
+
+  .customizer-grid {
+    grid-template-columns: 1fr;
   }
 
   .tutorial-grid {
