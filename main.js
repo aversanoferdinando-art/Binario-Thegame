@@ -18,6 +18,8 @@ let isMobileDevice = false;
 let lastSafePlayerPosition;
 let lastMobileButtonTime = 0;
 let powerUpOrb = null;
+let sunLight = null;
+let hemiLight = null;
 
 const keys = Object.create(null);
 const colliders = [];
@@ -28,7 +30,47 @@ const constructionLights = [];
 const compactedPatches = [];
 const excavationChunks = [];
 const powerUpParticles = [];
+const rainParticles = [];
+const trackQualityMarkers = [];
 const workObjects = {};
+
+const regulations = {
+  authority: 'Regole cantiere RFI/UE simulate',
+  minimumPpeScore: 100,
+  maxWorksiteSpeed: 6.0,
+  maxOnTrackSpeed: 3.0,
+  minimumBallastCompaction: 80,
+  minimumTrackGeometry: 85,
+  notes: [
+    'Protezione cantiere e segnalamento prima di occupare il binario.',
+    'Movimenti macchina a passo d’uomo con uomo a terra virtuale.',
+    'Sollevamento rotaie solo con pinza dedicata e area sgombra.',
+    'Rincalzatura per traverse successive con verifica geometria finale.'
+  ]
+};
+
+const trackState = {
+  railLoaded: false,
+  oldRailRemoved: false,
+  newRailPlaced: false,
+  geometryMm: 18,
+  twistMm: 11,
+  cantMm: 0,
+  stressReleased: false,
+  lockedSwitches: false
+};
+
+const weather = {
+  presets: [
+    { name: 'Sereno', sky: 0xbfd7ee, fogNear: 95, fogFar: 330, sun: 0.95, rain: 0, wind: 0.25 },
+    { name: 'Nuvoloso', sky: 0x9fb3c8, fogNear: 70, fogFar: 260, sun: 0.58, rain: 0, wind: 0.55 },
+    { name: 'Pioggia leggera', sky: 0x64748b, fogNear: 42, fogFar: 185, sun: 0.32, rain: 0.75, wind: 0.95 }
+  ],
+  index: 0,
+  timer: 0,
+  duration: 42,
+  rainGroup: null
+};
 const materials = {};
 const dom = {};
 
@@ -98,6 +140,17 @@ function clamp01(value) {
 
 function percent(value) {
   return Math.round(clamp(value, 0, 100)) + '%';
+}
+
+function formatKmh(ms) {
+  return Math.abs(ms * 3.6).toFixed(1) + ' km/h';
+}
+
+function currentMachineName() {
+  if (activeVehicle === loader) return 'Vaiacar strada-rotaia';
+  if (activeVehicle === tamper) return 'Rincalzatrice';
+  if (activeVehicle === excavator) return 'Piccolo escavatore';
+  return 'Operatore a piedi';
 }
 
 function smoothTowards(current, target, rate, delta) {
@@ -221,7 +274,9 @@ class RailRoadLoader {
     this.group.position.copy(position);
     this.group.rotation.y = Math.PI * 0.96;
     this.speed = 0;
-    this.maxSpeed = 6.0;
+    this.maxSpeed = 5.2; // 18,7 km/h: limite realistico in cantiere simulato.
+    this.acceleration = 1.9;
+    this.brakeRate = 3.4;
     this.turnSpeed = 1.0;
     this.turretAngle = 0;
     this.armAngle = -0.34;
@@ -361,6 +416,10 @@ class RailRoadLoader {
       this.sequence = null;
       this.carriedRail = null;
       workPhaseManager.metrics.railReplacementProgress = 55;
+      trackState.oldRailRemoved = true;
+      trackState.geometryMm = 24;
+      trackState.twistMm = 13;
+      updateTrackDynamics(0);
       workPhaseManager.completeCurrentPhase();
     }
 
@@ -401,6 +460,11 @@ class RailRoadLoader {
       this.sequence = null;
       this.carriedRail = null;
       workPhaseManager.metrics.railReplacementProgress = 100;
+      trackState.railLoaded = true;
+      trackState.newRailPlaced = true;
+      trackState.geometryMm = 16;
+      trackState.twistMm = 9;
+      updateTrackDynamics(0);
       workPhaseManager.completeCurrentPhase();
     }
 
@@ -429,7 +493,7 @@ class RailRoadLoader {
         turnInput = clamp(turnInput, -1, 1);
       }
 
-      this.speed = smoothTowards(this.speed, forwardInput * this.maxSpeed, 2.6, delta);
+      this.speed = smoothTowards(this.speed, forwardInput * this.maxSpeed, forwardInput ? this.acceleration : this.brakeRate, delta);
       this.group.rotation.y += turnInput * this.turnSpeed * delta * (Math.abs(this.speed) > 0.1 ? 1 : 0.45);
 
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.group.quaternion);
@@ -462,7 +526,9 @@ class TampingMachine {
     this.group.rotation.y = 0;
     this.isControlled = false;
     this.speed = 0;
-    this.maxSpeed = 3.0;
+    this.maxSpeed = 2.5; // 9 km/h in avanzamento di lavoro.
+    this.acceleration = 1.2;
+    this.brakeRate = 3.0;
     this.cycleActive = false;
     this.cycleTime = 0;
     this.tampedCount = 0;
@@ -572,6 +638,10 @@ class TampingMachine {
       workPhaseManager.metrics.tampingProgress = Math.min(100, this.tampedCount * 10);
       workPhaseManager.metrics.trackGeometryQuality = Math.min(100, 45 + this.tampedCount * 5.4);
       workPhaseManager.metrics.ballastCompaction = Math.min(100, 45 + this.tampedCount * 4.5);
+      trackState.geometryMm = Math.max(2.5, 18 - this.tampedCount * 1.55);
+      trackState.twistMm = Math.max(1.5, 11 - this.tampedCount * 0.95);
+      trackState.cantMm = Math.min(4, this.tampedCount * 0.35);
+      updateTrackDynamics(0);
 
       compactBallastAt(this.group.position.z);
       playTone(150, 0.08, 'triangle');
@@ -634,7 +704,7 @@ class TampingMachine {
         forwardInput = clamp(forwardInput, -1, 1);
       }
 
-      this.speed = smoothTowards(this.speed, forwardInput * this.maxSpeed, 2.8, delta);
+      this.speed = smoothTowards(this.speed, forwardInput * this.maxSpeed, forwardInput ? this.acceleration : this.brakeRate, delta);
       this.group.position.z += this.speed * delta;
       this.group.position.x = world.workTrackX;
       this.group.position.z = clamp(this.group.position.z, -64, 55);
@@ -652,7 +722,9 @@ class ExcavatorMachine {
     this.group.rotation.y = -Math.PI * 0.5;
     this.isControlled = false;
     this.speed = 0;
-    this.maxSpeed = 3.8;
+    this.maxSpeed = 2.2; // miniescavatore: traslazione lenta e fluida.
+    this.acceleration = 1.35;
+    this.brakeRate = 2.9;
     this.turnSpeed = 0.9;
     this.swing = -0.25;
     this.boomAngle = -0.36;
@@ -762,6 +834,8 @@ class ExcavatorMachine {
       this.soilLoad.visible = false;
       addDumpTruckLoad(this.loadedScoops);
       workPhaseManager.metrics.excavationProgress = Math.min(100, this.loadedScoops * 20);
+      trackState.geometryMm = Math.max(12, trackState.geometryMm - 0.7);
+      updateTrackDynamics(0);
       playTone(220, 0.08, 'triangle');
       if (this.loadedScoops >= 5) {
         workPhaseManager.completeCurrentPhase();
@@ -788,7 +862,7 @@ class ExcavatorMachine {
         forwardInput = clamp(forwardInput + -touchInput.y, -1, 1);
         turnInput = clamp(turnInput + -touchInput.x, -1, 1);
       }
-      this.speed = smoothTowards(this.speed, forwardInput * this.maxSpeed, 3.2, delta);
+      this.speed = smoothTowards(this.speed, forwardInput * this.maxSpeed, forwardInput ? this.acceleration : this.brakeRate, delta);
       this.group.rotation.y += turnInput * this.turnSpeed * delta;
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.group.quaternion);
       this.group.position.addScaledVector(forward, this.speed * delta);
@@ -853,13 +927,13 @@ class WorkPhaseManager {
       },
       {
         name: 'SCAVO BALLAST CON ESCAVATORE',
-        objective: 'Sali sull’escavatore, scava il cumulo e carica 5 benne nel camion.',
+        objective: 'Sali sul piccolo escavatore, scava il cumulo e carica 5 benne nel camion.',
         controls: 'ISO style: WASD cingoli · Q/E rotazione torretta · R/F braccio · T/G avambraccio · Z/X benna · Space/AZIONE scava/scarica',
         onEnter: () => {
           workObjects.prepZone.setVisible(false);
           excavator.entryZone.setVisible(activeVehicle !== excavator);
           workObjects.dumpZone.setVisible(true);
-          this.setMessage('Modalità escavatore: usa i comandi idraulici per riempire la benna dal cumulo e scaricare nel camion.');
+          this.setMessage('Modalità piccolo escavatore: usa i comandi idraulici per riempire la benna dal cumulo e scaricare nel camion.');
         },
         update: () => {
           this.phaseProgress = this.metrics.excavationProgress;
@@ -869,7 +943,7 @@ class WorkPhaseManager {
       },
       {
         name: 'RIMOZIONE ROTAIA',
-        objective: 'Sali sul caricatore strada-rotaia e avvia il sollevamento della rotaia vecchia.',
+        objective: 'Sali sul Vaiacar strada-rotaia e avvia il sollevamento della rotaia vecchia.',
         controls: 'E: sali/scendi · Joystick/WASD: guida · AZIONE/Space: rimozione',
         onEnter: () => {
           if (activeVehicle) exitVehicle();
@@ -887,11 +961,11 @@ class WorkPhaseManager {
       {
         name: 'POSA ROTAIA NUOVA',
         objective: 'Preleva la rotaia nuova dal deposito e posala sulle traverse.',
-        controls: 'Dentro il caricatore: AZIONE/Space avvia posa guidata',
+        controls: 'Dentro il Vaiacar: AZIONE/Space avvia posa guidata',
         onEnter: () => {
           loader.entryZone.setVisible(activeVehicle !== loader);
           workObjects.newRail.mesh.material.emissive.setHex(0x164e2b);
-          this.setMessage('Rotaia nuova pronta nel deposito. Tocca AZIONE mentre sei nel caricatore.');
+          this.setMessage('Rotaia nuova pronta nel deposito. Tocca AZIONE mentre sei nel Vaiacar.');
         },
         update: () => {
           this.phaseProgress = clamp((this.metrics.railReplacementProgress - 55) / 45 * 100, 0, 100);
@@ -954,7 +1028,9 @@ class WorkPhaseManager {
             tamper.tampedCount >= 8,
             m.trackGeometryQuality >= 85,
             m.ballastCompaction >= 80,
-            m.safetyScore >= 100
+            m.safetyScore >= 100,
+            trackState.geometryMm <= 6,
+            trackState.twistMm <= 4
           ];
 
           this.phaseProgress = checks.filter(Boolean).length / checks.length * 100;
@@ -1030,7 +1106,7 @@ class WorkPhaseManager {
   handleAction() {
     if (this.phaseIndex === 2) {
       if (activeVehicle === excavator) excavator.operateBucket();
-      else this.setMessage('Devi prima salire sull’escavatore: premi E vicino alla cabina.');
+      else this.setMessage('Devi prima salire sul piccolo escavatore: premi E vicino alla cabina.');
       return;
     }
 
@@ -1038,7 +1114,7 @@ class WorkPhaseManager {
       if (activeVehicle === loader) {
         if (!loader.sequence) loader.startRemoveSequence(workObjects.oldRail);
       } else {
-        this.setMessage('Devi prima salire sul caricatore: tocca ENTRA/E vicino al mezzo.');
+        this.setMessage('Devi prima salire sul Vaiacar: tocca ENTRA/E vicino al mezzo.');
       }
       return;
     }
@@ -1047,7 +1123,7 @@ class WorkPhaseManager {
       if (activeVehicle === loader) {
         if (!loader.sequence) loader.startPlaceSequence(workObjects.newRail);
       } else {
-        this.setMessage('Devi prima salire sul caricatore per posare la rotaia.');
+        this.setMessage('Devi prima salire sul Vaiacar per posare la rotaia.');
       }
       return;
     }
@@ -1136,6 +1212,10 @@ function cacheDom() {
   dom.powerUpName = document.getElementById('powerUpName');
   dom.powerUpStatus = document.getElementById('powerUpStatus');
   dom.powerUpButton = document.getElementById('powerUpButton');
+  dom.weatherText = document.getElementById('weatherText');
+  dom.trackStateText = document.getElementById('trackStateText');
+  dom.regulationText = document.getElementById('regulationText');
+  dom.speedText = document.getElementById('speedText');
 }
 
 function createScene() {
@@ -1167,6 +1247,8 @@ function createScene() {
   createRailRoadLoader();
   createTampingMachine();
   createInteractionAndWorkZones();
+  createWeatherSystem();
+  createDynamicTrackIndicators();
 
   workPhaseManager = new WorkPhaseManager();
 }
@@ -1212,10 +1294,11 @@ function createMaterials() {
 }
 
 function createLights() {
-  const hemi = new THREE.HemisphereLight(0xdbeafe, 0x6b4f30, 0.82);
-  scene.add(hemi);
+  hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x6b4f30, 0.82);
+  scene.add(hemiLight);
 
-  const sun = new THREE.DirectionalLight(0xffffff, 0.95);
+  sunLight = new THREE.DirectionalLight(0xffffff, 0.95);
+  const sun = sunLight;
   sun.position.set(-38, 48, 26);
   sun.castShadow = !isMobileDevice;
   sun.shadow.camera.left = -80;
@@ -1739,6 +1822,110 @@ function compactBallastAt(z) {
   compactedPatches.push(patch);
 }
 
+
+function getRegulationStatus() {
+  const m = workPhaseManager ? workPhaseManager.metrics : null;
+  if (!m) return regulations.authority;
+  const warnings = [];
+  const currentSpeed = activeVehicle ? Math.abs(activeVehicle.speed || 0) : Math.abs(player ? player.speed || 0 : 0);
+  const speedLimit = activeVehicle === tamper ? regulations.maxOnTrackSpeed : regulations.maxWorksiteSpeed;
+
+  if (m.safetyScore < regulations.minimumPpeScore && workPhaseManager.phaseIndex > 0) warnings.push('protezione cantiere incompleta');
+  if (currentSpeed > speedLimit) warnings.push('velocità sopra limite simulato');
+  if (workPhaseManager.phaseIndex >= 4 && !trackState.oldRailRemoved) warnings.push('rotaia vecchia non liberata');
+  if (workPhaseManager.phaseIndex >= 5 && !trackState.newRailPlaced) warnings.push('posa rotaia non confermata');
+  if (workPhaseManager.phaseIndex === 7 && m.ballastCompaction < regulations.minimumBallastCompaction) warnings.push('compattazione sotto soglia');
+  if (workPhaseManager.phaseIndex === 7 && m.trackGeometryQuality < regulations.minimumTrackGeometry) warnings.push('geometria sotto soglia');
+
+  return warnings.length ? 'Verifica normativa: ' + warnings.join(' · ') : 'Normativa OK: ' + regulations.notes[workPhaseManager.phaseIndex % regulations.notes.length];
+}
+
+function createWeatherSystem() {
+  weather.rainGroup = new THREE.Group();
+  weather.rainGroup.visible = false;
+
+  const rainMaterial = new THREE.MeshBasicMaterial({ color: 0xbfdbfe, transparent: true, opacity: 0.42 });
+  const rainGeometry = new THREE.BoxGeometry(0.018, 0.55, 0.018);
+  const count = isMobileDevice ? 90 : 180;
+  for (let i = 0; i < count; i++) {
+    const drop = new THREE.Mesh(rainGeometry, rainMaterial);
+    drop.position.set((Math.random() - 0.5) * 70, 8 + Math.random() * 26, -80 + Math.random() * 165);
+    drop.rotation.z = -0.18;
+    weather.rainGroup.add(drop);
+    rainParticles.push(drop);
+  }
+
+  scene.add(weather.rainGroup);
+  applyWeatherPreset();
+}
+
+function applyWeatherPreset() {
+  const preset = weather.presets[weather.index];
+  scene.background = new THREE.Color(preset.sky);
+  scene.fog.color.setHex(preset.sky);
+  scene.fog.near = preset.fogNear;
+  scene.fog.far = preset.fogFar;
+  if (sunLight) sunLight.intensity = preset.sun;
+  if (hemiLight) hemiLight.intensity = 0.52 + preset.sun * 0.32;
+  if (weather.rainGroup) weather.rainGroup.visible = preset.rain > 0;
+}
+
+function updateWeather(delta) {
+  weather.timer += delta;
+  if (weather.timer > weather.duration) {
+    weather.timer = 0;
+    weather.index = (weather.index + 1) % weather.presets.length;
+    applyWeatherPreset();
+    if (workPhaseManager) workPhaseManager.setMessage('Meteo aggiornato: ' + weather.presets[weather.index].name + '. Adegua velocità e visibilità di cantiere.');
+  }
+
+  const preset = weather.presets[weather.index];
+  if (preset.rain > 0 && weather.rainGroup) {
+    rainParticles.forEach((drop) => {
+      drop.position.y -= (12 + preset.wind * 4) * delta;
+      drop.position.x += preset.wind * 0.45 * delta;
+      if (drop.position.y < 0.2) {
+        drop.position.y = 18 + Math.random() * 16;
+        drop.position.x = (Math.random() - 0.5) * 70;
+        drop.position.z = -80 + Math.random() * 165;
+      }
+    });
+  }
+}
+
+function createDynamicTrackIndicators() {
+  const gaugeMaterial = new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.46 });
+  for (let i = 0; i < 12; i++) {
+    const z = -56 + i * 8.2;
+    const marker = createBox(2.25, 0.035, 0.16, gaugeMaterial.clone(), world.workTrackX, 0.88, z);
+    marker.name = 'dynamic-track-gauge-' + i;
+    scene.add(marker);
+    trackQualityMarkers.push(marker);
+  }
+  updateTrackDynamics(0);
+}
+
+function updateTrackDynamics(delta) {
+  if (!trackQualityMarkers.length) return;
+  const m = workPhaseManager ? workPhaseManager.metrics : null;
+  const geometryQuality = m ? m.trackGeometryQuality : 35;
+  const compaction = m ? m.ballastCompaction : 35;
+  const severity = clamp01(1 - ((geometryQuality + compaction) / 2) / 100);
+
+  trackQualityMarkers.forEach((marker, index) => {
+    const pulse = Math.sin(performance.now() * 0.002 + index) * 0.05;
+    marker.scale.x = 1 + severity * 0.6 + pulse;
+    marker.position.y = 0.88 + severity * 0.08;
+    marker.material.color.setHex(severity > 0.45 ? 0xf97316 : severity > 0.18 ? 0xfacc15 : 0x22c55e);
+    marker.material.opacity = 0.28 + severity * 0.36;
+  });
+
+  if (delta > 0 && m && !tamper?.cycleActive && workPhaseManager?.phaseIndex >= 4) {
+    trackState.geometryMm = smoothTowards(trackState.geometryMm, Math.max(3, 22 - geometryQuality * 0.18), 0.4, delta);
+    trackState.twistMm = smoothTowards(trackState.twistMm, Math.max(2, 13 - compaction * 0.1), 0.4, delta);
+  }
+}
+
 function createPowerUpOrb() {
   const group = new THREE.Group();
   group.position.set(-5.6, 1.15, -33.5);
@@ -2064,9 +2251,9 @@ function enterVehicle(vehicle, desiredCameraMode) {
 
   workPhaseManager.setMessage(
     vehicle === excavator
-      ? 'Sei sull’escavatore. Usa Q/E torretta, R/F braccio, T/G avambraccio, Z/X benna, Space/AZIONE per scavo o scarico.'
+      ? 'Sei sul piccolo escavatore. Usa Q/E torretta, R/F braccio, T/G avambraccio, Z/X benna, Space/AZIONE per scavo o scarico.'
       : vehicle === loader
-        ? 'Sei sul caricatore strada-rotaia. Usa AZIONE per avviare la lavorazione guidata.'
+        ? 'Sei sul Vaiacar strada-rotaia. Usa AZIONE per caricare, rimuovere o posare la rotaia in modo guidato.'
         : 'Sei sulla rincalzatrice. Premi AZIONE per il ciclo sulla traversa evidenziata.'
   );
 }
@@ -2108,6 +2295,7 @@ function updatePlayer(delta) {
 
   player.velocity.x = smoothTowards(player.velocity.x, targetVelocity.x, rate, delta);
   player.velocity.z = smoothTowards(player.velocity.z, targetVelocity.z, rate, delta);
+  player.speed = player.velocity.length();
 
   lastSafePlayerPosition.copy(player.position);
   player.position.addScaledVector(player.velocity, delta);
@@ -2159,9 +2347,9 @@ function updateInteractionHints(delta) {
   if (activeVehicle) {
     hint = 'Premi E/ESCI per scendere dal mezzo';
   } else if (workPhaseManager.phaseIndex === 2 && excavator.entryZone.contains(player.position)) {
-    hint = 'Premi E/ENTRA per salire sull’escavatore';
+    hint = 'Premi E/ENTRA per salire sul piccolo escavatore';
   } else if ((workPhaseManager.phaseIndex === 3 || workPhaseManager.phaseIndex === 4) && loader.entryZone.contains(player.position)) {
-    hint = 'Premi E/ENTRA per salire sul caricatore';
+    hint = 'Premi E/ENTRA per salire sul Vaiacar';
   } else if (workPhaseManager.phaseIndex === 6 && tamper.entryZone.contains(player.position)) {
     hint = 'Premi E/ENTRA per salire sulla rincalzatrice';
   } else if (workPhaseManager.phaseIndex === 1 && workObjects.prepZone.contains(player.position)) {
@@ -2200,6 +2388,13 @@ function updateHUD() {
 
   dom.controlsText.textContent = phase.controls;
   dom.messageText.textContent = workPhaseManager.message;
+  if (dom.weatherText) dom.weatherText.textContent = weather.presets[weather.index].name + ' · vento ' + weather.presets[weather.index].wind.toFixed(1) + ' m/s';
+  if (dom.trackStateText) dom.trackStateText.textContent = 'scartamento Δ ' + trackState.geometryMm.toFixed(1) + ' mm · sghembo ' + trackState.twistMm.toFixed(1) + ' mm';
+  if (dom.regulationText) dom.regulationText.textContent = getRegulationStatus();
+  if (dom.speedText) {
+    const moving = activeVehicle ? activeVehicle.speed : player.speed;
+    dom.speedText.textContent = currentMachineName() + ' · ' + formatKmh(moving || 0);
+  }
   updatePowerUpHud();
   updateMobileButtons();
 
@@ -2314,6 +2509,8 @@ function animate() {
   updatePlayer(delta);
   updateVehicles(delta);
   updatePowerUp(delta);
+  updateWeather(delta);
+  updateTrackDynamics(delta);
   updateWorkPhases(delta);
   updateInteractionHints(delta);
   updateHUD();
