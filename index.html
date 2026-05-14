@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Binario Evolution - Construction Ops</title>
+  <title>Binario Reboot - Rift Rail</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -13,76 +13,76 @@
       <div class="paint-stroke stroke-two"></div>
       <div class="splash-feed-card">
         <div class="feed-meta">
-          <span>Construction Simulator: Evolution</span>
-          <strong>Steam style · Binario rebuild</strong>
+          <span>Rift Rail: Reboot</span>
+          <strong>Neon ops · gioco riscritto</strong>
         </div>
         <div class="feed-image-frame">
           <img src="splash.jpg" alt="Cantiere ferroviario con mezzi pesanti" />
-          <span class="game-badge">Binario<br />Evolution</span>
+          <span class="game-badge">Rift<br />Rail</span>
         </div>
-        <h1>CIFA entra in cantiere</h1>
-        <p>Non più solo una lista di fasi: scegli il contratto, governa mezzi pesanti, consegna materiali e trasforma il piazzale in una missione da simulatore moderno.</p>
-        <button id="splashEnterButton" type="button">Apri feed contratti</button>
+        <h1>Ripartiamo da zero</h1>
+        <p>Basta vicoli ciechi: il gioco diventa una corsa operativa a zone, con obiettivi chiari, ritmo arcade, dashboard neon e progressione da missione.</p>
+        <button id="splashEnterButton" type="button">Entra nel reboot</button>
       </div>
     </div>
 
     <div id="menuScreen" class="screen hidden">
       <div class="menu-card contract-board">
         <div class="board-header">
-          <p class="eyebrow">Rinnovamento totale</p>
-          <h1>Construction Ops: Binario Evolution</h1>
+          <p class="eyebrow">Nuova identità</p>
+          <h1>Rift Rail: Cantiere Reboot</h1>
           <p class="mission-text">
-            La partita diventa un contratto operativo: pianifica la commessa, seleziona l’operatore,
-            entra nel cantiere e completa consegne, demolizioni, posa e collaudo come in un feed di simulatori moderni.
+            La vecchia esperienza viene ribaltata: non una sequenza statica, ma una run a distretti.
+            Entra, scegli la squadra, conquista zone operative e chiudi milestone per reputazione, crediti e qualità.
           </p>
         </div>
 
-        <div class="contract-feed" aria-label="Contratto principale">
+        <div class="contract-feed" aria-label="Run principale">
           <article class="contract-card is-active">
             <div class="contract-thumb">
               <img src="splash.jpg" alt="Mezzi da cantiere in una missione urbana" />
-              <span>CIFA x Rail</span>
+              <span>Rift x Rail</span>
             </div>
             <div class="contract-copy">
-              <small>Contratto premium</small>
-              <strong>Ricostruisci l’accesso ferroviario urbano</strong>
-              <p>Scava, carica, rimuovi rotaia, posa il nuovo tratto e consegna il collaudo qualità.</p>
+              <small>Run principale</small>
+              <strong>Conquista il corridoio ferroviario</strong>
+              <p>Avanza da marker a marker, alterna mezzi e operatore, completa task rapidi e fai salire la reputazione della zona.</p>
             </div>
           </article>
           <article class="contract-card locked">
             <div class="contract-icon">02</div>
             <div class="contract-copy">
-              <small>Prossima espansione</small>
-              <strong>Trasporto calcestruzzo e logistica</strong>
-              <p>Slot pronto per nuove missioni da cantiere generale.</p>
+              <small>Prossimo distretto</small>
+              <strong>Hub notturno e consegne speciali</strong>
+              <p>Spazio pronto per missioni più libere e varianti a tempo.</p>
             </div>
           </article>
         </div>
 
         <div class="customizer-card" aria-label="Personalizzazione personaggio">
           <div class="customizer-head">
-            <span class="eyebrow">Profilo operatore</span>
-            <strong>Imposta avatar e squadra</strong>
+            <span class="eyebrow">Crew reboot</span>
+            <strong>Scegli identità della run</strong>
           </div>
           <label>
             Nome
-            <input id="avatarName" type="text" maxlength="16" value="Capocantiere" autocomplete="off" />
+            <input id="avatarName" type="text" maxlength="16" value="Runner" autocomplete="off" />
           </label>
           <div class="customizer-grid">
             <label>
               Tuta
               <select id="avatarSuit">
-                <option value="orange">Alta visibilità</option>
-                <option value="blue">Blu tecnico</option>
-                <option value="black">Urban nero</option>
+                <option value="orange">Neon arancio</option>
+                <option value="blue">Tech blu</option>
+                <option value="black">Stealth nero</option>
               </select>
             </label>
             <label>
               Casco
               <select id="avatarHelmet">
-                <option value="yellow">Giallo safety</option>
-                <option value="white">Bianco engineer</option>
-                <option value="red">Rosso rescue</option>
+                <option value="yellow">Giallo hazard</option>
+                <option value="white">Bianco drone</option>
+                <option value="red">Rosso rift</option>
               </select>
             </label>
             <label>
@@ -95,35 +95,35 @@
             </label>
           </div>
         </div>
-        <button id="playButton" type="button">Accetta contratto</button>
-        <p class="small-note">Nuovo stile card-feed · gameplay a commesse · ottimizzato mobile/desktop</p>
+        <button id="playButton" type="button">Avvia run reboot</button>
+        <p class="small-note">Nuovo visual neon · loop a zone · HUD da missione arcade</p>
       </div>
     </div>
 
     <div id="tutorialScreen" class="screen tutorial hidden">
       <div class="menu-card tutorial-card">
-        <p class="eyebrow">Briefing operativo</p>
-        <h2>Nuovo modo di giocare</h2>
+        <p class="eyebrow">Briefing reboot</p>
+        <h2>Nuova regola: conquista la zona</h2>
         <div class="tutorial-grid">
           <div>
-            <strong>1. Accetta la commessa</strong>
-            <span>Ogni fase è un obiettivo di contratto con pagamento ideale: raggiungi il marker e aggiorna il cantiere.</span>
+            <strong>1. Avvia la run</strong>
+            <span>Ogni step è un checkpoint di distretto: raggiungi il marker, completa il gesto richiesto e incassa reputazione.</span>
           </div>
           <div>
-            <strong>2. Usa i mezzi giusti</strong>
-            <span>Escavatore per demolire e caricare, Vaiacar per logistica rotaie, rincalzatrice per collaudo finale.</span>
+            <strong>2. Cambia ruolo al volo</strong>
+            <span>Operatore, escavatore, Vaiacar e rincalzatrice diventano classi di gioco con azioni rapide e obiettivi separati.</span>
           </div>
           <div>
-            <strong>3. Consegna milestone</strong>
-            <span>Il pulsante AZIONE diventa SCAVA, RIMUOVI, POSA, FISSA o RINCALZA in base al contratto.</span>
+            <strong>3. Tieni alto il ritmo</strong>
+            <span>AZIONE cambia in SCAVA, RECUPERA, POSA, FISSA o RINCALZA: meno attesa, più feedback immediato.</span>
           </div>
           <div>
-            <strong>4. Turbo Contract</strong>
-            <span>Raccogli il nucleo azzurro: è un boost da simulatore arcade per velocizzare lavorazioni e spostamenti.</span>
+            <strong>4. Rift Boost</strong>
+            <span>Raccogli il nucleo azzurro per aprire una finestra turbo: velocità, lavorazioni e punteggio salgono.</span>
           </div>
         </div>
         <div class="tutorial-actions">
-          <button id="tutorialStartButton" type="button">Avvia cantiere</button>
+          <button id="tutorialStartButton" type="button">Lancia run</button>
           <button id="tutorialSkipButton" class="secondary-button" type="button">Salta briefing</button>
         </div>
       </div>
@@ -132,72 +132,77 @@
     <aside id="hud" class="hud hidden">
       <div class="hud-head">
         <div>
-          <p class="hud-kicker">Contratto attivo</p>
-          <h2>CIFA Urban Rail Evolution</h2>
+          <p class="hud-kicker">Run attiva</p>
+          <h2>Rift Rail · Zona 01</h2>
         </div>
         <button id="hudClose" type="button" aria-label="Chiudi HUD">×</button>
       </div>
 
       <div class="hud-block contract-status-card">
-        <div class="hud-label">MILESTONE ATTUALE</div>
+        <div class="hud-label">CHECKPOINT ATTUALE</div>
         <div id="phaseName" class="hud-value">-</div>
         <div id="phaseObjective" class="hud-note">-</div>
         <div class="progress-line">
-          <span>Avanzamento contratto</span>
+          <span>Avanzamento run</span>
           <strong id="phaseProgressText">0%</strong>
         </div>
         <div class="bar">
           <div id="phaseProgressBar" class="bar-fill"></div>
         </div>
+        <div class="run-economy" aria-label="Statistiche run">
+          <div><span>Rep</span><strong id="reputationText">0</strong></div>
+          <div><span>Crediti</span><strong id="creditsText">€0</strong></div>
+          <div><span>Tempo</span><strong id="timerText">00:00</strong></div>
+        </div>
       </div>
 
       <div class="hud-block task-block">
-        <div class="hud-label">ROADMAP COMMESSA</div>
+        <div class="hud-label">MAPPA ZONE</div>
         <ul id="taskList" class="task-list">
-          <li data-step="0">Sopralluogo</li>
-          <li data-step="1">Setup area</li>
-          <li data-step="2">Demolizione ballast</li>
-          <li data-step="3">Recupero vecchia rotaia</li>
-          <li data-step="4">Consegna nuova rotaia</li>
-          <li data-step="5">Montaggio attacchi</li>
-          <li data-step="6">Compattazione dinamica</li>
-          <li data-step="7">Collaudo e payout</li>
+          <li data-step="0">Scan iniziale</li>
+          <li data-step="1">Attiva hub</li>
+          <li data-step="2">Break ballast</li>
+          <li data-step="3">Recupera asset</li>
+          <li data-step="4">Drop nuova rotaia</li>
+          <li data-step="5">Lock attacchi</li>
+          <li data-step="6">Stabilizza linea</li>
+          <li data-step="7">Upload QA</li>
         </ul>
       </div>
 
       <div class="hud-block powerup-panel">
         <div>
-          <div class="hud-label">BOOST CONTRATTO</div>
-          <strong id="powerUpName">Turbo Contract</strong>
-          <span id="powerUpStatus">Cerca il nucleo azzurro in cantiere.</span>
+          <div class="hud-label">RIFT BOOST</div>
+          <strong id="powerUpName">Rift Boost</strong>
+          <span id="powerUpStatus">Cerca il nucleo azzurro nella zona.</span>
         </div>
         <button id="powerUpButton" type="button">BOOST</button>
       </div>
 
       <div class="hud-block metrics-grid">
-        <div><span>Demolizione</span><strong id="excavationProgressText">0%</strong></div>
-        <div><span>Logistica</span><strong id="railProgressText">0%</strong></div>
-        <div><span>Montaggio</span><strong id="fasteningProgressText">0%</strong></div>
-        <div><span>Compattazione</span><strong id="tampingProgressText">0%</strong></div>
-        <div><span>Qualità</span><strong id="qualityText">0%</strong></div>
-        <div><span>Ballast</span><strong id="compactionText">0%</strong></div>
-        <div><span>Sicurezza</span><strong id="safetyText">0%</strong></div>
-        <div><span>Flotta</span><strong id="speedText">0 km/h</strong></div>
+        <div><span>Break</span><strong id="excavationProgressText">0%</strong></div>
+        <div><span>Asset</span><strong id="railProgressText">0%</strong></div>
+        <div><span>Lock</span><strong id="fasteningProgressText">0%</strong></div>
+        <div><span>Stability</span><strong id="tampingProgressText">0%</strong></div>
+        <div><span>QA</span><strong id="qualityText">0%</strong></div>
+        <div><span>Grip</span><strong id="compactionText">0%</strong></div>
+        <div><span>Shield</span><strong id="safetyText">0%</strong></div>
+        <div><span>Classe</span><strong id="speedText">0 km/h</strong></div>
       </div>
 
       <div class="hud-block simulator-status">
-        <div><span>Meteo</span><strong id="weatherText">Sereno</strong></div>
-        <div><span>Asset binario</span><strong id="trackStateText">-</strong></div>
-        <div><span>QA commessa</span><strong id="regulationText">-</strong></div>
+        <div><span>Scenario</span><strong id="weatherText">Sereno</strong></div>
+        <div><span>Linea</span><strong id="trackStateText">-</strong></div>
+        <div><span>Compliance</span><strong id="regulationText">-</strong></div>
       </div>
 
       <div class="hud-block controls-block">
-        <div class="hud-label">COMANDI RAPIDI</div>
+        <div class="hud-label">INPUT RAPIDI</div>
         <div id="controlsText" class="hud-note">-</div>
       </div>
 
       <div id="messageText" class="hud-message">Avvicinati alla zona evidenziata.</div>
-      <button id="helpButton" class="help-button" type="button">Portami al prossimo marker</button>
+      <button id="helpButton" class="help-button" type="button">Ping prossimo checkpoint</button>
     </aside>
 
     <div id="interactionHint" class="interaction-hint hidden">Premi E</div>
@@ -219,10 +224,10 @@
 
     <div id="finalScreen" class="screen final hidden">
       <div class="menu-card success">
-        <p class="eyebrow">Contratto completato</p>
-        <h2>Payout sbloccato</h2>
-        <p>Cantiere consegnato: demolizione, logistica, posa, fissaggi, compattazione e controllo qualità sono in stato verde.</p>
-        <button id="restartButton" type="button">Nuovo contratto</button>
+        <p class="eyebrow">Run completata</p>
+        <h2>Zona conquistata</h2>
+        <p>Il vecchio percorso è stato sostituito da una run chiara: checkpoint, boost, reputazione e QA sono in stato verde.</p>
+        <button id="restartButton" type="button">Nuova run</button>
       </div>
     </div>
   </div>

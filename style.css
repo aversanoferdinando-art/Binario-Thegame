@@ -920,3 +920,276 @@ button:active {
     bottom: 132px;
   }
 }
+
+/* Rift Rail Reboot: override radicale del vecchio look */
+:root {
+  --ink: #f8fbff;
+  --muted: #9fb0c7;
+  --paper: #07111f;
+  --card: rgba(8, 18, 34, 0.88);
+  --line: rgba(125, 249, 255, 0.2);
+  --blue: #00e5ff;
+  --blue-dark: #6d28d9;
+  --yellow: #f9ff4a;
+  --orange: #ff6b35;
+  --green: #39ff88;
+  --shadow: 0 30px 90px rgba(0, 229, 255, 0.18), 0 20px 80px rgba(0, 0, 0, 0.52);
+}
+
+body {
+  background: #04070f;
+  color: var(--ink);
+}
+
+#gameRoot {
+  background:
+    linear-gradient(120deg, rgba(0, 229, 255, 0.08) 0 1px, transparent 1px 52px),
+    linear-gradient(210deg, rgba(249, 255, 74, 0.05) 0 1px, transparent 1px 64px),
+    radial-gradient(circle at 10% 14%, rgba(0, 229, 255, 0.22), transparent 26%),
+    radial-gradient(circle at 88% 10%, rgba(109, 40, 217, 0.35), transparent 28%),
+    linear-gradient(180deg, #030712 0%, #07111f 58%, #0d1324 100%);
+}
+
+canvas {
+  filter: saturate(1.2) contrast(1.08) brightness(0.86);
+}
+
+.splash-screen,
+.screen {
+  background:
+    linear-gradient(120deg, rgba(0, 229, 255, 0.08) 0 1px, transparent 1px 48px),
+    radial-gradient(circle at 12% 16%, rgba(0, 229, 255, 0.28), transparent 28%),
+    radial-gradient(circle at 86% 18%, rgba(255, 107, 53, 0.18), transparent 24%),
+    linear-gradient(180deg, rgba(3, 7, 18, 0.96), rgba(7, 17, 31, 0.94));
+}
+
+.paint-stroke {
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--blue), var(--yellow), transparent);
+  opacity: 0.9;
+  box-shadow: 0 0 28px rgba(0, 229, 255, 0.75);
+}
+
+.stroke-one {
+  top: 5%;
+  left: -10%;
+  width: min(980px, 120vw);
+  transform: rotate(-19deg);
+  box-shadow:
+    90px 58px 0 rgba(0, 229, 255, 0.95),
+    250px 128px 0 rgba(249, 255, 74, 0.72),
+    540px 74px 0 rgba(109, 40, 217, 0.88);
+}
+
+.stroke-two {
+  right: -8%;
+  top: 20%;
+  width: 540px;
+  transform: rotate(16deg);
+  box-shadow: -90px 72px 0 rgba(255, 107, 53, 0.88), -150px 142px 0 rgba(0, 229, 255, 0.58);
+}
+
+.splash-feed-card,
+.menu-card,
+.hud {
+  border: 1px solid rgba(125, 249, 255, 0.22);
+  background:
+    linear-gradient(145deg, rgba(8, 18, 34, 0.94), rgba(11, 20, 38, 0.78)),
+    radial-gradient(circle at 90% 0%, rgba(0, 229, 255, 0.16), transparent 35%);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  backdrop-filter: blur(18px);
+}
+
+.splash-feed-card,
+.contract-board {
+  isolation: isolate;
+}
+
+.splash-feed-card::before,
+.contract-board::before,
+.hud::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  z-index: -1;
+  border-radius: inherit;
+  border: 1px solid rgba(249, 255, 74, 0.08);
+  pointer-events: none;
+}
+
+.feed-meta,
+.splash-feed-card p,
+.menu-card p,
+.contract-copy p,
+.tutorial-grid span,
+.hud-note,
+.hud-message,
+.small-note {
+  color: var(--muted) !important;
+}
+
+.feed-meta span,
+.feed-meta strong,
+.contract-copy strong,
+.customizer-head strong,
+.hud-value,
+.powerup-panel strong {
+  color: #ffffff;
+}
+
+.splash-feed-card h1,
+.menu-card h1,
+.menu-card h2 {
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: -0.08em;
+  text-shadow: 0 0 24px rgba(0, 229, 255, 0.25);
+}
+
+.feed-image-frame,
+.contract-thumb {
+  background: #050b14;
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.feed-image-frame img,
+.contract-thumb img {
+  filter: saturate(1.25) contrast(1.1) brightness(0.82);
+}
+
+.game-badge,
+.contract-thumb span,
+.contract-icon,
+.hud-toggle {
+  color: #04111d;
+  background: linear-gradient(135deg, var(--yellow), var(--blue));
+  box-shadow: 0 0 26px rgba(0, 229, 255, 0.34);
+}
+
+button {
+  color: #06101e;
+  background: linear-gradient(135deg, var(--yellow), var(--blue) 48%, #8b5cf6);
+  box-shadow: 0 18px 42px rgba(0, 229, 255, 0.26);
+}
+
+.secondary-button {
+  color: #e5f7ff;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(125, 249, 255, 0.24);
+}
+
+.eyebrow,
+.hud-kicker,
+.hud-label {
+  color: var(--blue);
+}
+
+.contract-card,
+.customizer-card,
+.tutorial-grid div,
+.hud-block,
+.metrics-grid div,
+.simulator-status div,
+.powerup-panel {
+  border-color: rgba(125, 249, 255, 0.18);
+  background: rgba(2, 8, 23, 0.58);
+  color: var(--ink);
+}
+
+.contract-card.is-active {
+  box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.28), 0 22px 48px rgba(0, 0, 0, 0.32);
+}
+
+.contract-card.locked,
+.customizer-card {
+  background: linear-gradient(135deg, rgba(3, 7, 18, 0.84), rgba(30, 41, 59, 0.48));
+}
+
+.customizer-card label,
+.customizer-card input,
+.customizer-card select {
+  color: #dff9ff;
+}
+
+.customizer-card input,
+.customizer-card select {
+  border-color: rgba(125, 249, 255, 0.25);
+  background: rgba(4, 10, 20, 0.82);
+}
+
+.bar {
+  background: rgba(148, 163, 184, 0.14);
+  border: 1px solid rgba(125, 249, 255, 0.14);
+}
+
+.bar-fill {
+  background: linear-gradient(90deg, var(--blue), var(--yellow));
+  box-shadow: 0 0 22px rgba(0, 229, 255, 0.5);
+}
+
+.task-list li {
+  border-color: rgba(125, 249, 255, 0.14);
+  background: rgba(15, 23, 42, 0.52);
+  color: #c6d7ef;
+}
+
+.task-list li.active {
+  color: #04111d;
+  background: linear-gradient(135deg, var(--yellow), var(--blue));
+}
+
+.task-list li.done {
+  color: var(--green);
+  border-color: rgba(57, 255, 136, 0.34);
+}
+
+.run-economy {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.run-economy div {
+  padding: 9px;
+  border-radius: 15px;
+  border: 1px solid rgba(125, 249, 255, 0.18);
+  background: rgba(0, 229, 255, 0.07);
+}
+
+.run-economy span,
+.metrics-grid span,
+.simulator-status span {
+  color: #7dd3fc;
+}
+
+.run-economy strong {
+  display: block;
+  margin-top: 3px;
+  color: #ffffff;
+  font-size: 0.95rem;
+}
+
+.interaction-hint {
+  color: #06101e;
+  background: linear-gradient(135deg, var(--yellow), var(--blue));
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.touch-stick {
+  background: rgba(2, 8, 23, 0.58);
+  border-color: rgba(0, 229, 255, 0.28);
+}
+
+.touch-knob,
+.mobile-actions button {
+  background: linear-gradient(135deg, var(--yellow), var(--blue));
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #06101e;
+}
+
+.final {
+  background: rgba(3, 7, 18, 0.72);
+}
