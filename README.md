@@ -1,14 +1,14 @@
 # Binario Reboot - Rift Rail
 
-Rinnovamento totale di **Binario - The Game**: il progetto abbandona la vecchia impostazione a commessa statica e passa a un’identità **simulatore ferroviario realistico/arcade**, con run a checkpoint, dashboard Rift e ricompense immediate.
+Rinnovamento totale di **Binario - The Game**: il progetto abbandona la vecchia impostazione a commessa statica e adotta un’identità da **simulatore ferroviario realistico/arcade**, con run a checkpoint, HUD mobile compatto e ricompense immediate.
 
-## Nuova direzione
+## Direzione consolidata
 
-- **Interfaccia completamente rifatta**: splash fotografico, HUD scuro, bottoni arancio effetto legno/metallo e joystick metallico come riferimento grafico principale.
-- **Menu a run**: il vecchio feed viene trasformato in una selezione di distretti, con crew personalizzabile e promessa di espansioni a zone.
-- **Gameplay reinterpretato**: le fasi diventano checkpoint di una run: scan, hub, break ballast, recupero asset, drop, lock, stabilizzazione e upload QA.
-- **HUD da simulatore mobile**: oltre ai KPI tecnici, il pannello mostra reputazione, crediti e timer della run, con il tasto HUD compatto in alto a sinistra.
-- **Controlli mobile corretti**: il pulsante ENTRA/AZIONE rimane cliccabile anche quando compare il suggerimento contestuale e ogni checkpoint assegna reputazione/crediti.
+- **Grafica risolta in un unico tema**: `style.css` non contiene più override stratificati; il look principale è quello realistico richiesto, con sfondo fotografico, HUD scuro, pulsanti arancio effetto legno/metallo e joystick metallico.
+- **Menu a run**: il feed è una selezione di distretti con crew personalizzabile e slot per espansioni.
+- **Gameplay a checkpoint**: scan, hub, break ballast, recupero asset, drop, lock, stabilizzazione e upload QA sostituiscono la vecchia progressione a commessa.
+- **HUD da simulatore mobile**: reputazione, crediti, timer, KPI e tasto HUD compatto in alto a sinistra restano visibili senza appesantire lo schermo.
+- **Controlli touch corretti**: il suggerimento contestuale non intercetta più i tap e il pulsante ENTRA/AZIONE resta utilizzabile su mobile.
 
 ## Ciclo di gioco attuale
 
