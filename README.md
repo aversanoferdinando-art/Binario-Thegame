@@ -1,25 +1,25 @@
-# Binario Evolution - Construction Ops
+# Binario Reboot - Rift Rail
 
-Restyling radicale di **Binario - The Game**: l’esperienza ora usa un’interfaccia da feed di simulatori moderni, con card contratti, immagine hero stile store mobile/Steam e HUD da commessa operativa.
+Rinnovamento totale di **Binario - The Game**: il progetto abbandona la vecchia impostazione a commessa statica e passa a un’identità **simulatore ferroviario realistico/arcade**, con run a checkpoint, dashboard Rift e ricompense immediate.
 
 ## Nuova direzione
 
-- **Interfaccia completamente rifatta**: splash in stile card feed con immagine grande, pennellate blu, badge del gioco e CTA “Apri feed contratti”.
-- **Menu a contratti**: il vecchio menu didattico diventa una bacheca di commesse con card missione principale e slot espansione.
-- **Gameplay reinterpretato**: le vecchie fasi diventano milestone di contratto CIFA/Construction Ops, dal sopralluogo al payout finale.
-- **HUD operativo**: pannello OPS chiaro, bianco e mobile-first con roadmap commessa, KPI, QA contratto e boost.
-- **Stile mobile simulator**: controlli, messaggi e pulsanti sono rinominati per una sensazione più arcade/gestionale.
+- **Interfaccia completamente rifatta**: splash fotografico, HUD scuro, bottoni arancio effetto legno/metallo e joystick metallico come riferimento grafico principale.
+- **Menu a run**: il vecchio feed viene trasformato in una selezione di distretti, con crew personalizzabile e promessa di espansioni a zone.
+- **Gameplay reinterpretato**: le fasi diventano checkpoint di una run: scan, hub, break ballast, recupero asset, drop, lock, stabilizzazione e upload QA.
+- **HUD da simulatore mobile**: oltre ai KPI tecnici, il pannello mostra reputazione, crediti e timer della run, con il tasto HUD compatto in alto a sinistra.
+- **Controlli mobile corretti**: il pulsante ENTRA/AZIONE rimane cliccabile anche quando compare il suggerimento contestuale e ogni checkpoint assegna reputazione/crediti.
 
 ## Ciclo di gioco attuale
 
-1. Accetta il contratto dal feed.
-2. Esegui sopralluogo e setup area.
-3. Demolisci e carica ballast con l’escavatore.
-4. Recupera la rotaia vecchia con il Vaiacar.
-5. Consegna e posa il nuovo modulo rotaia.
-6. Monta gli attacchi.
-7. Compatta con la rincalzatrice.
-8. Completa QA e sblocca il payout.
+1. Avvia la run dal menu Rift Rail.
+2. Scansiona il beacon iniziale.
+3. Attiva l’hub operativo.
+4. Usa la classe Breaker per demolire e caricare ballast.
+5. Usa la classe Logistica per recuperare l’asset vecchio e droppare il nuovo modulo.
+6. Chiudi i lock manuali sulla linea.
+7. Usa la classe Stabilizer per consolidare il tracciato.
+8. Completa l’upload QA e conquista la zona.
 
 ## Avvio locale
 

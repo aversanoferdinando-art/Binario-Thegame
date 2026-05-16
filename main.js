@@ -35,17 +35,17 @@ const trackQualityMarkers = [];
 const workObjects = {};
 
 const regulations = {
-  authority: 'Regole cantiere RFI/UE simulate',
+  authority: 'Protocollo Rift Rail simulato',
   minimumPpeScore: 100,
   maxWorksiteSpeed: 6.0,
   maxOnTrackSpeed: 3.0,
   minimumBallastCompaction: 80,
   minimumTrackGeometry: 85,
   notes: [
-    'Protezione cantiere e segnalamento prima di occupare il binario.',
-    'Movimenti macchina a passo d’uomo con uomo a terra virtuale.',
-    'Sollevamento rotaie solo con pinza dedicata e area sgombra.',
-    'Rincalzatura per traverse successive con verifica geometria finale.'
+    'Shield di zona e segnalamento prima di occupare la linea.',
+    'Movimenti macchina controllati con spotter virtuale.',
+    'Recupero asset solo con pinza dedicata e area sgombra.',
+    'Stabilizzazione per traverse successive con upload QA finale.'
   ]
 };
 
@@ -87,7 +87,7 @@ const avatarOptions = {
   suit: 'blue',
   helmet: 'yellow',
   skin: 'warm',
-  name: 'Capocantiere'
+  name: 'Runner'
 };
 
 const avatarPalette = {
@@ -109,7 +109,7 @@ const avatarPalette = {
 };
 
 const powerUp = {
-  name: 'Turbo Contract',
+  name: 'Rift Boost',
   collected: false,
   active: false,
   duration: 12,
@@ -117,6 +117,13 @@ const powerUp = {
   cooldown: 0,
   speedMultiplier: 1.75,
   workMultiplier: 1.35
+};
+
+const runState = {
+  reputation: 0,
+  credits: 0,
+  completedCheckpoints: 0,
+  checkpointReward: 1250
 };
 
 const world = {
@@ -146,11 +153,18 @@ function formatKmh(ms) {
   return Math.abs(ms * 3.6).toFixed(1) + ' km/h';
 }
 
+function formatRunTime(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return minutes + ':' + seconds;
+}
+
 function currentMachineName() {
-  if (activeVehicle === loader) return 'Vaiacar strada-rotaia';
-  if (activeVehicle === tamper) return 'Rincalzatrice';
-  if (activeVehicle === excavator) return 'Piccolo escavatore';
-  return 'Operatore a piedi';
+  if (activeVehicle === loader) return 'Classe Logistica';
+  if (activeVehicle === tamper) return 'Classe Stabilizer';
+  if (activeVehicle === excavator) return 'Classe Breaker';
+  return 'Runner a piedi';
 }
 
 function smoothTowards(current, target, rate, delta) {
@@ -274,7 +288,7 @@ class RailRoadLoader {
     this.group.position.copy(position);
     this.group.rotation.y = Math.PI * 0.96;
     this.speed = 0;
-    this.maxSpeed = 5.2; // 18,7 km/h: limite realistico in cantiere simulato.
+    this.maxSpeed = 5.2; // 18,7 km/h: limite controllato nella zona simulata.
     this.acceleration = 1.9;
     this.brakeRate = 3.4;
     this.turnSpeed = 1.0;
@@ -371,7 +385,7 @@ class RailRoadLoader {
     this.sequence = 'remove-old-rail';
     this.sequenceTime = 0;
     this.carriedRail = railSegment;
-    workPhaseManager.setMessage('La pinza aggancia la rotaia vecchia: sollevamento e deposito materiale usurato.');
+    workPhaseManager.setMessage('Pinza agganciata: asset vecchio recuperato e corridoio liberato.');
     return true;
   }
 
@@ -380,7 +394,7 @@ class RailRoadLoader {
     this.sequence = 'place-new-rail';
     this.sequenceTime = 0;
     this.carriedRail = railSegment;
-    workPhaseManager.setMessage('Prelievo rotaia nuova dal deposito e posa guidata sulla sede corretta.');
+    workPhaseManager.setMessage('Drop in corso: modulo nuovo prelevato e posato sulla sede corretta.');
     return true;
   }
 
@@ -882,11 +896,19 @@ class ExcavatorMachine {
   }
 }
 
+
+function awardCheckpoint(phaseIndex) {
+  runState.completedCheckpoints = Math.max(runState.completedCheckpoints, phaseIndex + 1);
+  runState.reputation = Math.min(999, runState.reputation + 15 + phaseIndex * 3);
+  runState.credits += runState.checkpointReward + phaseIndex * 350;
+  playTone(620 + phaseIndex * 35, 0.08, 'sawtooth');
+}
+
 class WorkPhaseManager {
   constructor() {
     this.phaseIndex = 0;
     this.phaseProgress = 0;
-    this.message = 'Contratto CIFA aperto: raggiungi il marker giallo per validare il sopralluogo iniziale.';
+    this.message = 'Run Rift Rail pronta: scansiona il primo checkpoint giallo e sblocca la zona.';
 
     this.metrics = {
       railReplacementProgress: 0,
@@ -900,12 +922,12 @@ class WorkPhaseManager {
 
     this.phases = [
       {
-        name: '01 · SOPRALLUOGO CONTRATTO',
-        objective: 'Raggiungi il punto giallo e trasforma il cantiere in una commessa attiva.',
-        controls: 'Joystick/WASD: muovi il capocantiere · CAM/C: cambia visuale · OPS: scheda contratto',
+        name: '01 · SCAN DISTRETTO',
+        objective: 'Raggiungi il beacon giallo: la vecchia intro diventa un avvio immediato della run.',
+        controls: 'Joystick/WASD: muovi il runner · CAM/C: cambia visuale · OPS: dashboard run',
         onEnter: () => {
           workObjects.inspectionZone.setVisible(true);
-          this.setMessage('Feed contratto aggiornato: entra nel marker giallo per aprire la commessa Evolution.');
+          this.setMessage('Segnale Rift agganciato: entra nel marker giallo e prendi controllo della Zona 01.');
         },
         update: () => {
           this.phaseProgress = workObjects.inspectionZone.contains(player.position) ? 100 : 0;
@@ -913,27 +935,27 @@ class WorkPhaseManager {
         }
       },
       {
-        name: '02 · SETUP AREA CIFA',
-        objective: 'Attiva recinzioni, fari e checkpoint: il cantiere deve sembrare vivo prima dei mezzi.',
-        controls: 'Joystick/WASD: raggiungi il marker · ENTRA/E: firma setup area',
+        name: '02 · ATTIVA HUB',
+        objective: 'Accendi hub, fari e barriere: la zona diventa un’arena operativa invece di un tutorial statico.',
+        controls: 'Joystick/WASD: raggiungi il marker · ENTRA/E: attiva hub',
         onEnter: () => {
           workObjects.inspectionZone.setVisible(false);
           workObjects.prepZone.setVisible(true);
-          this.setMessage('Prima milestone: firma il setup nel marker blu per accendere la scena da simulatore cantiere.');
+          this.setMessage('Primo switch: premi ENTRA/E nel marker blu per far partire hub, luci e checkpoint.');
         },
         update: () => {
           this.phaseProgress = this.metrics.safetyScore;
         }
       },
       {
-        name: '03 · DEMOLIZIONE E CARICO',
-        objective: 'Sali sull’escavatore, demolisci ballast e carica 5 benne: la commessa entra nel vivo.',
-        controls: 'Stile simulatore: WASD cingoli · Q/E torretta · R/F braccio · T/G avambraccio · Z/X benna · Space/AZIONE carico',
+        name: '03 · BREAK BALLAST',
+        objective: 'Prendi l’escavatore e completa una sfida rapida di demolizione: ogni benna vale progressione immediata.',
+        controls: 'Classe escavatore: WASD cingoli · Q/E torretta · R/F braccio · T/G avambraccio · Z/X benna · Space/AZIONE break',
         onEnter: () => {
           workObjects.prepZone.setVisible(false);
           excavator.entryZone.setVisible(activeVehicle !== excavator);
           workObjects.dumpZone.setVisible(true);
-          this.setMessage('Modalità escavatore CIFA: scava dal cumulo e scarica sul camion per completare la demolizione.');
+          this.setMessage('Classe Breaker attiva: scava dal cumulo, scarica sul camion e fai salire la barra Break.');
         },
         update: () => {
           this.phaseProgress = this.metrics.excavationProgress;
@@ -942,8 +964,8 @@ class WorkPhaseManager {
         }
       },
       {
-        name: '04 · RECUPERO ASSET FERROVIARIO',
-        objective: 'Usa il Vaiacar come mezzo logistico e rimuovi la rotaia vecchia dalla tratta urbana.',
+        name: '04 · RECUPERA ASSET',
+        objective: 'Passa alla classe logistica: aggancia la vecchia rotaia e liberala dal corridoio.',
         controls: 'ENTRA/E: cabina · Joystick/WASD: guida · AZIONE/Space: recupera asset',
         onEnter: () => {
           if (activeVehicle) exitVehicle();
@@ -951,7 +973,7 @@ class WorkPhaseManager {
           workObjects.dumpZone.setVisible(false);
           workObjects.oldRail.mesh.material.emissive.setHex(0x662200);
           loader.entryZone.setVisible(activeVehicle !== loader);
-          this.setMessage('Asset da recuperare evidenziato: entra nel Vaiacar e avvia la sequenza logistica.');
+          this.setMessage('Asset ostile evidenziato: entra nel Vaiacar e lancia la sequenza di recupero.');
         },
         update: () => {
           this.phaseProgress = clamp(this.metrics.railReplacementProgress / 55 * 100, 0, 100);
@@ -959,13 +981,13 @@ class WorkPhaseManager {
         }
       },
       {
-        name: '05 · CONSEGNA NUOVO MODULO',
-        objective: 'Trasporta il nuovo modulo rotaia dal deposito e posalo con una consegna guidata.',
-        controls: 'Dentro il Vaiacar: AZIONE/Space conferma consegna e posa guidata',
+        name: '05 · DROP MODULO NUOVO',
+        objective: 'Trasforma la logistica in un drop: porta il modulo nuovo sulla linea e conferma la posa.',
+        controls: 'Dentro il Vaiacar: AZIONE/Space conferma drop e posa guidata',
         onEnter: () => {
           loader.entryZone.setVisible(activeVehicle !== loader);
           workObjects.newRail.mesh.material.emissive.setHex(0x164e2b);
-          this.setMessage('Modulo nuovo pronto in deposito: il feed contratto aspetta la consegna sulla linea.');
+          this.setMessage('Drop pronto in deposito: la dashboard aspetta la posa del nuovo modulo sulla linea.');
         },
         update: () => {
           this.phaseProgress = clamp((this.metrics.railReplacementProgress - 55) / 45 * 100, 0, 100);
@@ -973,14 +995,14 @@ class WorkPhaseManager {
         }
       },
       {
-        name: '06 · MONTAGGIO ATTACCHI',
-        objective: 'Completa i marker di montaggio: ogni attacco chiuso aumenta il valore del contratto.',
-        controls: 'Joystick/WASD: pattuglia i marker · ENTRA/E: monta attacco',
+        name: '06 · LOCK ATTACCHI',
+        objective: 'Corri sui marker verdi e chiudi i lock: ogni attacco aumenta reputazione e stabilità.',
+        controls: 'Joystick/WASD: pattuglia i marker · ENTRA/E: chiudi lock',
         onEnter: () => {
           if (activeVehicle) exitVehicle();
           loader.entryZone.setVisible(false);
           fasteningPoints.forEach((zone) => zone.setVisible(true));
-          this.setMessage('Montaggio manuale: chiudi tutti gli attacchi, i marker verdi sono milestone consegnate.');
+          this.setMessage('Modalità runner: chiudi tutti i lock verdi e trasforma la linea in un percorso stabile.');
         },
         update: () => {
           const completed = fasteningPoints.filter((zone) => zone.completed).length;
@@ -990,14 +1012,14 @@ class WorkPhaseManager {
         }
       },
       {
-        name: '07 · COMPATTAZIONE DINAMICA',
-        objective: 'Porta la rincalzatrice sui marker e completa 8-10 cicli per stabilizzare la consegna.',
-        controls: 'ENTRA/E: cabina · Joystick su/giù: avanza · AZIONE/Space: compatta',
+        name: '07 · STABILIZZA LINEA',
+        objective: 'Guida la rincalzatrice sui marker e completa cicli rapidi per stabilizzare la zona.',
+        controls: 'ENTRA/E: cabina · Joystick su/giù: avanza · AZIONE/Space: stabilizza',
         onEnter: () => {
           fasteningPoints.forEach((zone) => zone.setVisible(false));
           tamper.entryZone.setVisible(activeVehicle !== tamper);
           tampingMarkers.forEach((zone, index) => zone.setVisible(index < 10));
-          this.setMessage('Compattazione dinamica: vibra e stabilizza il ballast per chiudere il contratto.');
+          this.setMessage('Stabilizzazione attiva: completa i cicli vibro e porta la linea in stato verde.');
         },
         update: () => {
           this.phaseProgress = this.metrics.tampingProgress;
@@ -1010,14 +1032,14 @@ class WorkPhaseManager {
         }
       },
       {
-        name: '08 · COLLAUDO E PAYOUT',
-        objective: 'Valida qualità, sicurezza e asset consegnati: quando tutto è verde sblocchi il payout.',
-        controls: 'CAM/C: visuale finale · MENU/Esc: feed contratti',
+        name: '08 · UPLOAD QA',
+        objective: 'Chiudi la run con l’upload QA: se i KPI sono verdi la zona è conquistata.',
+        controls: 'CAM/C: visuale finale · MENU/Esc: menu reboot',
         onEnter: () => {
           if (activeVehicle) exitVehicle();
           tamper.entryZone.setVisible(false);
           tampingMarkers.forEach((zone) => zone.setVisible(false));
-          this.setMessage('Collaudo finale: porta ogni KPI sopra soglia e incassa la commessa Evolution.');
+          this.setMessage('Upload QA finale: porta ogni KPI sopra soglia e chiudi la run Rift Rail.');
         },
         update: (delta) => {
           const m = this.metrics;
@@ -1040,7 +1062,7 @@ class WorkPhaseManager {
             m.ballastCompaction = smoothTowards(m.ballastCompaction, 88, 1.8, delta);
             showFinalScreen();
           } else {
-            this.setMessage('Payout bloccato: completa le milestone mancanti e porta i KPI in verde.');
+            this.setMessage('Upload bloccato: completa i checkpoint mancanti e porta i KPI in verde.');
           }
         }
       }
@@ -1098,7 +1120,7 @@ class WorkPhaseManager {
         nearest.mesh.material.opacity = 0.28;
         addFasteningPlate(nearest.position);
         playTone(240, 0.07, 'square');
-        this.setMessage('Milestone montaggio registrata. Passa al prossimo punto evidenziato.');
+        this.setMessage('Lock registrato. Scatta al prossimo marker verde.');
       }
     }
   }
@@ -1106,7 +1128,7 @@ class WorkPhaseManager {
   handleAction() {
     if (this.phaseIndex === 2) {
       if (activeVehicle === excavator) excavator.operateBucket();
-      else this.setMessage('Serve l’escavatore per questa milestone: premi E vicino alla cabina.');
+      else this.setMessage('Serve la classe Breaker: premi E vicino all’escavatore.');
       return;
     }
 
@@ -1114,7 +1136,7 @@ class WorkPhaseManager {
       if (activeVehicle === loader) {
         if (!loader.sequence) loader.startRemoveSequence(workObjects.oldRail);
       } else {
-        this.setMessage('Serve il Vaiacar logistico: tocca ENTRA/E vicino al mezzo.');
+        this.setMessage('Serve la classe Logistica: tocca ENTRA/E vicino al Vaiacar.');
       }
       return;
     }
@@ -1123,20 +1145,21 @@ class WorkPhaseManager {
       if (activeVehicle === loader) {
         if (!loader.sequence) loader.startPlaceSequence(workObjects.newRail);
       } else {
-        this.setMessage('La consegna richiede il Vaiacar: entra in cabina per posare il modulo.');
+        this.setMessage('Il drop richiede il Vaiacar: entra in cabina per posare il modulo.');
       }
       return;
     }
 
     if (this.phaseIndex === 6) {
       if (activeVehicle === tamper) tamper.startCycle();
-      else this.setMessage('Serve la rincalzatrice per chiudere la compattazione dinamica.');
+      else this.setMessage('Serve la classe Stabilizer: entra nella rincalzatrice.');
     }
   }
 
   completeCurrentPhase() {
     if (this.phaseIndex >= this.phases.length - 1) return;
     this.phaseProgress = 100;
+    awardCheckpoint(this.phaseIndex);
     this.phaseIndex += 1;
     this.phaseProgress = 0;
     this.phases[this.phaseIndex].onEnter();
@@ -1185,6 +1208,9 @@ function cacheDom() {
   dom.phaseObjective = document.getElementById('phaseObjective');
   dom.phaseProgressText = document.getElementById('phaseProgressText');
   dom.phaseProgressBar = document.getElementById('phaseProgressBar');
+  dom.reputationText = document.getElementById('reputationText');
+  dom.creditsText = document.getElementById('creditsText');
+  dom.timerText = document.getElementById('timerText');
   dom.excavationProgressText = document.getElementById('excavationProgressText');
   dom.railProgressText = document.getElementById('railProgressText');
   dom.fasteningProgressText = document.getElementById('fasteningProgressText');
@@ -1830,10 +1856,10 @@ function getRegulationStatus() {
   const currentSpeed = activeVehicle ? Math.abs(activeVehicle.speed || 0) : Math.abs(player ? player.speed || 0 : 0);
   const speedLimit = activeVehicle === tamper ? regulations.maxOnTrackSpeed : regulations.maxWorksiteSpeed;
 
-  if (m.safetyScore < regulations.minimumPpeScore && workPhaseManager.phaseIndex > 0) warnings.push('protezione cantiere incompleta');
+  if (m.safetyScore < regulations.minimumPpeScore && workPhaseManager.phaseIndex > 0) warnings.push('shield zona incompleto');
   if (currentSpeed > speedLimit) warnings.push('velocità sopra limite simulato');
-  if (workPhaseManager.phaseIndex >= 4 && !trackState.oldRailRemoved) warnings.push('rotaia vecchia non liberata');
-  if (workPhaseManager.phaseIndex >= 5 && !trackState.newRailPlaced) warnings.push('posa rotaia non confermata');
+  if (workPhaseManager.phaseIndex >= 4 && !trackState.oldRailRemoved) warnings.push('asset vecchio non liberato');
+  if (workPhaseManager.phaseIndex >= 5 && !trackState.newRailPlaced) warnings.push('drop nuova linea non confermato');
   if (workPhaseManager.phaseIndex === 7 && m.ballastCompaction < regulations.minimumBallastCompaction) warnings.push('compattazione sotto soglia');
   if (workPhaseManager.phaseIndex === 7 && m.trackGeometryQuality < regulations.minimumTrackGeometry) warnings.push('geometria sotto soglia');
 
@@ -1876,7 +1902,7 @@ function updateWeather(delta) {
     weather.timer = 0;
     weather.index = (weather.index + 1) % weather.presets.length;
     applyWeatherPreset();
-    if (workPhaseManager) workPhaseManager.setMessage('Meteo aggiornato: ' + weather.presets[weather.index].name + '. Adegua velocità e visibilità di cantiere.');
+    if (workPhaseManager) workPhaseManager.setMessage('Scenario aggiornato: ' + weather.presets[weather.index].name + '. Adegua velocità e visibilità della run.');
   }
 
   const preset = weather.presets[weather.index];
@@ -1985,7 +2011,7 @@ function updatePowerUp(delta) {
       powerUp.collected = true;
       powerUpOrb.visible = false;
       playTone(620, 0.08, 'sine');
-      if (workPhaseManager) workPhaseManager.setMessage('Hai raccolto Turbo Contract. Premi F o BOOST per attivare il power-up.');
+      if (workPhaseManager) workPhaseManager.setMessage('Hai raccolto Rift Boost. Premi F o BOOST per aprire la finestra turbo.');
     }
   }
 
@@ -1999,7 +2025,7 @@ function updatePowerUp(delta) {
       player.group.traverse((child) => {
         if (child.isMesh && child.material && child.material.emissive) child.material.emissive.setHex(0x000000);
       });
-      if (workPhaseManager) workPhaseManager.setMessage('Turbo Contract esaurito. Continua la missione con ritmo normale.');
+      if (workPhaseManager) workPhaseManager.setMessage('Rift Boost esaurito. Continua la run con ritmo normale.');
     }
   }
 
@@ -2089,21 +2115,39 @@ function setupMobileControls() {
   });
 }
 
+function runMobileButtonAction(action) {
+  if (!gameStarted) return;
+
+  const now = performance.now();
+  if (now - lastMobileButtonTime < 120) return;
+  lastMobileButtonTime = now;
+  action();
+}
+
 function bindMobileButton(button, action) {
   button.addEventListener('pointerdown', function (event) {
     event.preventDefault();
+    event.stopPropagation();
+    if (button.setPointerCapture && event.pointerId !== undefined) {
+      button.setPointerCapture(event.pointerId);
+    }
     button.classList.add('is-pressed');
   });
 
   button.addEventListener('pointerup', function (event) {
     event.preventDefault();
+    event.stopPropagation();
+    if (button.releasePointerCapture && button.hasPointerCapture && event.pointerId !== undefined && button.hasPointerCapture(event.pointerId)) {
+      button.releasePointerCapture(event.pointerId);
+    }
     button.classList.remove('is-pressed');
-    if (!gameStarted) return;
+    runMobileButtonAction(action);
+  });
 
-    const now = performance.now();
-    if (now - lastMobileButtonTime < 120) return;
-    lastMobileButtonTime = now;
-    action();
+  button.addEventListener('click', function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    runMobileButtonAction(action);
   });
 
   button.addEventListener('pointercancel', function () { button.classList.remove('is-pressed'); });
@@ -2125,6 +2169,9 @@ function showTutorial() {
 function startGame() {
   gameStarted = true;
   world.missionStartedAt = performance.now();
+  runState.reputation = 0;
+  runState.credits = 0;
+  runState.completedCheckpoints = 0;
   dom.menuScreen.classList.add('hidden');
   dom.tutorialScreen.classList.add('hidden');
   dom.hud.classList.remove('hidden');
@@ -2251,10 +2298,10 @@ function enterVehicle(vehicle, desiredCameraMode) {
 
   workPhaseManager.setMessage(
     vehicle === excavator
-      ? 'Sei sul piccolo escavatore. Usa Q/E torretta, R/F braccio, T/G avambraccio, Z/X benna, Space/AZIONE per scavo o scarico.'
+      ? 'Classe Breaker attiva: Q/E torretta, R/F braccio, T/G avambraccio, Z/X benna, Space/AZIONE per break o scarico.'
       : vehicle === loader
-        ? 'Sei sul Vaiacar strada-rotaia. Usa AZIONE per caricare, rimuovere o posare la rotaia in modo guidato.'
-        : 'Sei sulla rincalzatrice. Premi AZIONE per il ciclo sulla traversa evidenziata.'
+        ? 'Classe Logistica attiva: usa AZIONE per recuperare asset o posare il nuovo modulo guidato.'
+        : 'Classe Stabilizer attiva: premi AZIONE sul marker per chiudere il ciclo vibro.'
   );
 }
 
@@ -2347,16 +2394,16 @@ function updateInteractionHints(delta) {
   if (activeVehicle) {
     hint = 'Premi E/ESCI per scendere dal mezzo';
   } else if (workPhaseManager.phaseIndex === 2 && excavator.entryZone.contains(player.position)) {
-    hint = 'Premi E/ENTRA per salire sul piccolo escavatore';
+    hint = 'Premi E/ENTRA per classe Breaker';
   } else if ((workPhaseManager.phaseIndex === 3 || workPhaseManager.phaseIndex === 4) && loader.entryZone.contains(player.position)) {
-    hint = 'Premi E/ENTRA per salire sul Vaiacar';
+    hint = 'Premi E/ENTRA per classe Logistica';
   } else if (workPhaseManager.phaseIndex === 6 && tamper.entryZone.contains(player.position)) {
-    hint = 'Premi E/ENTRA per salire sulla rincalzatrice';
+    hint = 'Premi E/ENTRA per classe Stabilizer';
   } else if (workPhaseManager.phaseIndex === 1 && workObjects.prepZone.contains(player.position)) {
-    hint = 'Premi E/ENTRA per attivare il cantiere';
+    hint = 'Premi E/ENTRA per attivare l’hub';
   } else if (workPhaseManager.phaseIndex === 5) {
     const point = fasteningPoints.find((zone) => !zone.completed && zone.contains(player.position));
-    if (point) hint = 'Premi E/ENTRA per fissare attacco rotaia';
+    if (point) hint = 'Premi E/ENTRA per chiudere lock linea';
   }
 
   if (hint) {
@@ -2377,6 +2424,9 @@ function updateHUD() {
   dom.phaseObjective.textContent = phase.objective;
   dom.phaseProgressText.textContent = percent(workPhaseManager.phaseProgress);
   dom.phaseProgressBar.style.width = percent(workPhaseManager.phaseProgress);
+  if (dom.reputationText) dom.reputationText.textContent = String(runState.reputation);
+  if (dom.creditsText) dom.creditsText.textContent = '€' + runState.credits.toLocaleString('it-IT');
+  if (dom.timerText) dom.timerText.textContent = formatRunTime(performance.now() - world.missionStartedAt);
 
   dom.excavationProgressText.textContent = percent(m.excavationProgress);
   dom.railProgressText.textContent = percent(m.railReplacementProgress);
@@ -2388,8 +2438,8 @@ function updateHUD() {
 
   dom.controlsText.textContent = phase.controls;
   dom.messageText.textContent = workPhaseManager.message;
-  if (dom.weatherText) dom.weatherText.textContent = weather.presets[weather.index].name + ' · vento ' + weather.presets[weather.index].wind.toFixed(1) + ' m/s';
-  if (dom.trackStateText) dom.trackStateText.textContent = 'asset Δ ' + trackState.geometryMm.toFixed(1) + ' mm · twist ' + trackState.twistMm.toFixed(1) + ' mm';
+  if (dom.weatherText) dom.weatherText.textContent = weather.presets[weather.index].name + ' · wind ' + weather.presets[weather.index].wind.toFixed(1) + ' m/s';
+  if (dom.trackStateText) dom.trackStateText.textContent = 'rift Δ ' + trackState.geometryMm.toFixed(1) + ' mm · twist ' + trackState.twistMm.toFixed(1) + ' mm';
   if (dom.regulationText) dom.regulationText.textContent = getRegulationStatus();
   if (dom.speedText) {
     const moving = activeVehicle ? activeVehicle.speed : player.speed;
@@ -2413,20 +2463,35 @@ function updatePowerUpHud() {
   dom.powerUpButton.disabled = !powerUp.collected || powerUp.active || powerUp.cooldown > 0;
 
   if (!powerUp.collected) {
-    dom.powerUpStatus.textContent = 'Cerca il boost azzurro per accelerare la commessa.';
+    dom.powerUpStatus.textContent = 'Cerca il nucleo azzurro per aprire il Rift Boost.';
   } else if (powerUp.active) {
     dom.powerUpStatus.textContent = 'Attivo: ' + powerUp.remaining.toFixed(1) + 's · velocità x' + powerUp.speedMultiplier;
   } else if (powerUp.cooldown > 0) {
     dom.powerUpStatus.textContent = 'Ricarica: ' + powerUp.cooldown.toFixed(1) + 's';
   } else {
-    dom.powerUpStatus.textContent = 'Pronto: premi F o BOOST per modalità arcade.';
+    dom.powerUpStatus.textContent = 'Pronto: premi F o BOOST per spingere la run.';
   }
 }
 
 function updateMobileButtons() {
   if (!dom.mobileInteract || !dom.mobileAction || !workPhaseManager) return;
 
-  dom.mobileInteract.textContent = activeVehicle ? 'ESCI' : 'ENTRA';
+  if (activeVehicle) {
+    dom.mobileInteract.textContent = 'Premi E/ESCI per scendere dal mezzo';
+  } else if (workPhaseManager.phaseIndex === 1) {
+    dom.mobileInteract.textContent = 'Premi E/ENTRA per attivare l’hub';
+  } else if (workPhaseManager.phaseIndex === 2) {
+    dom.mobileInteract.textContent = 'Premi E/ENTRA per salire sull’escavatore';
+  } else if (workPhaseManager.phaseIndex === 3 || workPhaseManager.phaseIndex === 4) {
+    dom.mobileInteract.textContent = 'Premi E/ENTRA per salire sul Vaiacar';
+  } else if (workPhaseManager.phaseIndex === 5) {
+    dom.mobileInteract.textContent = 'Premi E/ENTRA per chiudere lock linea';
+  } else if (workPhaseManager.phaseIndex === 6) {
+    dom.mobileInteract.textContent = 'Premi E/ENTRA per salire sulla rincalzatrice';
+  } else {
+    dom.mobileInteract.textContent = 'ENTRA';
+  }
+
   if (workPhaseManager.phaseIndex === 6) {
     dom.mobileAction.textContent = 'RINCALZA';
   } else if (workPhaseManager.phaseIndex === 5) {
@@ -2434,7 +2499,7 @@ function updateMobileButtons() {
   } else if (workPhaseManager.phaseIndex === 4) {
     dom.mobileAction.textContent = 'POSA';
   } else if (workPhaseManager.phaseIndex === 3) {
-    dom.mobileAction.textContent = 'RIMUOVI';
+    dom.mobileAction.textContent = 'RECUPERA';
   } else if (workPhaseManager.phaseIndex === 2) {
     dom.mobileAction.textContent = 'SCAVA';
   } else {
