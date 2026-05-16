@@ -898,7 +898,10 @@ class ExcavatorMachine {
 
 
 function awardCheckpoint(phaseIndex) {
-  runState.completedCheckpoints = Math.max(runState.completedCheckpoints, phaseIndex + 1);
+  const checkpointNumber = phaseIndex + 1;
+  if (runState.completedCheckpoints >= checkpointNumber) return;
+
+  runState.completedCheckpoints = checkpointNumber;
   runState.reputation = Math.min(999, runState.reputation + 15 + phaseIndex * 3);
   runState.credits += runState.checkpointReward + phaseIndex * 350;
   playTone(620 + phaseIndex * 35, 0.08, 'sawtooth');
@@ -1060,6 +1063,7 @@ class WorkPhaseManager {
           if (this.phaseProgress >= 100) {
             m.trackGeometryQuality = smoothTowards(m.trackGeometryQuality, 92, 1.8, delta);
             m.ballastCompaction = smoothTowards(m.ballastCompaction, 88, 1.8, delta);
+            awardCheckpoint(this.phaseIndex);
             showFinalScreen();
           } else {
             this.setMessage('Upload bloccato: completa i checkpoint mancanti e porta i KPI in verde.');

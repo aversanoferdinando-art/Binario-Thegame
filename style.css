@@ -908,24 +908,24 @@ button:active,
   .mobile-actions {
     right: max(10px, env(safe-area-inset-right));
     bottom: max(24px, env(safe-area-inset-bottom));
-    grid-template-columns: minmax(126px, 1.35fr) minmax(82px, 0.8fr);
-    gap: 9px;
-    width: min(238px, calc(100vw - 154px));
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+    width: clamp(118px, calc(100vw - 186px), 150px);
   }
 
   .mobile-actions button {
-    min-height: 58px;
-    border-radius: 18px;
-    padding: 8px 9px;
+    min-height: 46px;
+    border-radius: 16px;
+    padding: 7px 8px;
   }
 
   #mobileInteract {
-    min-height: 68px;
-    font-size: 0.72rem;
+    min-height: 54px;
+    font-size: 0.7rem;
   }
 
   #mobileMenu {
-    width: 104px;
+    width: 100%;
   }
 }
 
