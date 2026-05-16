@@ -1,14 +1,14 @@
 # Binario Reboot - Rift Rail
 
-Rinnovamento totale di **Binario - The Game**: il progetto abbandona la vecchia impostazione a commessa statica e adotta un’identità da **simulatore ferroviario realistico/arcade**, con run a checkpoint, HUD mobile compatto e ricompense immediate.
+Rinnovamento totale di **Binario - The Game**: il progetto abbandona la vecchia impostazione a commessa statica e consolida un’identità da **simulatore ferroviario realistico/arcade** con accenti neon operativi, run a checkpoint, dashboard Rift, HUD mobile compatto e ricompense immediate.
 
 ## Direzione consolidata
 
-- **Grafica risolta in un unico tema**: `style.css` non contiene più override stratificati; il look principale è quello realistico richiesto, con sfondo fotografico, HUD scuro, pulsanti arancio effetto legno/metallo e joystick metallico.
-- **Menu a run**: il feed è una selezione di distretti con crew personalizzabile e slot per espansioni.
+- **Grafica risolta in un unico tema**: `style.css` non contiene più override stratificati; il look principale unisce sfondo fotografico, HUD scuro, accenti neon, pulsanti arancio effetto legno/metallo e joystick metallico.
+- **Menu a run**: il feed è una selezione di distretti con crew personalizzabile e slot per espansioni a zone.
 - **Gameplay a checkpoint**: scan, hub, break ballast, recupero asset, drop, lock, stabilizzazione e upload QA sostituiscono la vecchia progressione a commessa.
 - **HUD da simulatore mobile**: reputazione, crediti, timer, KPI e tasto HUD compatto in alto a sinistra restano visibili senza appesantire lo schermo.
-- **Controlli touch corretti**: il suggerimento contestuale non intercetta più i tap e il pulsante ENTRA/AZIONE resta utilizzabile su mobile.
+- **Feedback più rapido**: ogni checkpoint completato assegna reputazione/crediti, aggiorna subito la mappa zone e mantiene utilizzabili i controlli touch senza intercettare tap indesiderati.
 
 ## Ciclo di gioco attuale
 
