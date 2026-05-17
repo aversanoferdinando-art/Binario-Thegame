@@ -1,25 +1,26 @@
-# Binario Reboot - Rift Rail
+# Binario The Game - Cantiere Mobile
 
-Rinnovamento totale di **Binario - The Game**: il progetto abbandona la vecchia impostazione a commessa statica e passa a un’identità **neon arcade-operativa**, con run a checkpoint, dashboard Rift e ricompense immediate.
+Il progetto è stato riscritto come mockup giocabile in stile simulatore mobile: una schermata verticale con cantiere ferroviario generato in CSS, pulsante **HUD**, joystick metallico, messaggio centrale e controlli gialli come nella reference.
 
-## Nuova direzione
+## Cosa include
 
-- **Interfaccia completamente rifatta**: splash dark/neon, griglia tecnica, card traslucide, badge Rift Rail e CTA orientate al reboot.
-- **Menu a run**: il vecchio feed viene trasformato in una selezione di distretti, con crew personalizzabile e promessa di espansioni a zone.
-- **Gameplay reinterpretato**: le fasi diventano checkpoint di una run: scan, hub, break ballast, recupero asset, drop, lock, stabilizzazione e upload QA.
-- **HUD da missione arcade**: oltre ai KPI tecnici, il pannello mostra reputazione, crediti e timer della run.
-- **Feedback più rapido**: ogni checkpoint completato assegna reputazione/crediti e aggiorna subito la mappa zone.
+- **Menu principale pulito** con pulsante `ENTRA NEL GIOCO`, pausa, riprendi e reset missione.
+- **Scena full-screen verticale** con deposito, alberi, binari, mezzi e operai disegnati in CSS per evitare immagini sbagliate o ritagli del logo.
+- **HUD compatto** apribile dal pulsante in alto a sinistra solo dopo l'ingresso in gioco.
+- **Joystick metallico** con frecce direzionali e feedback visivo.
+- **Pulsanti SCAVA, BOOST, CAM e MENU** con finitura gialla/oro.
+- **Loop semplice senza conflitti di ID**: entra nell'escavatore, scava, usa il boost, cambia camera, apri il menu e riprendi la partita.
 
-## Ciclo di gioco attuale
+## Comandi
 
-1. Avvia la run dal menu Rift Rail.
-2. Scansiona il beacon iniziale.
-3. Attiva l’hub operativo.
-4. Usa la classe Breaker per demolire e caricare ballast.
-5. Usa la classe Logistica per recuperare l’asset vecchio e droppare il nuovo modulo.
-6. Chiudi i lock manuali sulla linea.
-7. Usa la classe Stabilizer per consolidare il tracciato.
-8. Completa l’upload QA e conquista la zona.
+| Azione | Touch / Mouse | Tastiera |
+| --- | --- | --- |
+| Entra nel gioco dal menu | `ENTRA NEL GIOCO` | `Invio` o `Spazio` |
+| Entra o scendi dall'escavatore | ENTRA / SCAVA quando sei a piedi | `E` o `Invio` |
+| Scava | SCAVA | `Spazio` o `X` |
+| Boost | BOOST | `B` |
+| Cambia camera | CAM | `C` |
+| Menu / Pausa | MENU | `Esc` |
 
 ## Avvio locale
 
