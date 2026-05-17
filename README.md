@@ -1,22 +1,22 @@
 # Binario The Game - Cantiere Mobile
 
-Il progetto è stato riscritto come mockup giocabile in stile simulatore mobile: una schermata verticale con sfondo di cantiere ferroviario, pulsante **HUD**, joystick metallico, messaggio centrale e controlli gialli come nella reference.
+Mockup giocabile in stile simulatore mobile per un cantiere ferroviario. La schermata verticale usa lo sfondo del cantiere, HUD apribile, mini-mappa, joystick metallico e pulsanti gialli in stile macchina operatrice.
 
-## Cosa include
+## Stato della riscrittura
 
-- **Scena full-screen verticale** con immagine del cantiere e vignettatura cinematografica.
-- **HUD compatto** apribile dal pulsante in alto a sinistra.
-- **Joystick metallico** con frecce direzionali e feedback visivo.
-- **Pulsanti SCAVA, BOOST, CAM e MENU** con finitura gialla/oro.
-- **Loop semplice senza conflitti di ID**: entra nell'escavatore, scava, usa il boost, cambia camera e resetta dal menu.
+- Nessun marker di conflitto Git residuo nei file sorgente.
+- ID HTML e selettori JavaScript allineati in un unico flusso di gioco.
+- UI mobile riorganizzata con topbar, HUD missione, mini-mappa, area di lavoro e banner di completamento.
+- Loop completo: raggiungi l'escavatore, sali a bordo, scava, livella, ispeziona e consegna il binario.
 
 ## Comandi
 
 | Azione | Touch / Mouse | Tastiera |
 | --- | --- | --- |
-| Entra o scendi dall'escavatore | ENTRA / SCAVA quando sei a piedi | `E` o `Invio` |
-| Scava | SCAVA | `Spazio` o `X` |
-| Boost | BOOST | `B` |
+| Muovi operatore o escavatore | Joystick | Frecce o `WASD` |
+| Entra o scendi dall'escavatore | ENTRA / LAVORA quando sei a piedi | `E` o `Invio` |
+| Lavora sul binario | LAVORA | `Spazio` o `X` |
+| Boost temporaneo | BOOST | `B` |
 | Cambia camera | CAM | `C` |
 | Menu | MENU | `Esc` |
 

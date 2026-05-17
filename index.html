@@ -10,34 +10,66 @@
 <body>
   <main id="gameRoot" class="game-root" aria-label="Binario The Game">
     <section id="playfield" class="playfield" aria-live="polite">
-      <img class="rail-bg" src="splash.jpg" alt="Cantiere ferroviario con mezzi e binari" />
+      <img id="railBg" class="rail-bg" src="splash.jpg" alt="Cantiere ferroviario con mezzi e binari" />
       <div class="scene-vignette" aria-hidden="true"></div>
+      <div class="site-grid" aria-hidden="true"></div>
       <div class="phone-safe-top" aria-hidden="true"></div>
 
-      <button id="hudButton" class="hud-pill" type="button" aria-expanded="false" aria-controls="hudPanel">HUD</button>
-
-      <div id="vehicleMarker" class="vehicle-marker excavator" aria-label="Escavatore selezionabile">
-        <span class="marker-cabin"></span>
-        <span class="marker-arm"></span>
-      </div>
-
-      <div id="workerMarker" class="worker-marker" aria-label="Operatore di cantiere"></div>
+      <header class="topbar" aria-label="Stato partita">
+        <button id="hudButton" class="hud-pill" type="button" aria-expanded="false" aria-controls="hudPanel">HUD</button>
+        <div class="mission-chip">
+          <span id="shiftText">Turno 06:30</span>
+          <strong id="missionTitle">Deposito Binario 01</strong>
+        </div>
+        <div class="score-chip" aria-label="Punteggio">
+          <span>XP</span>
+          <strong id="scoreText">0</strong>
+        </div>
+      </header>
 
       <section id="hudPanel" class="hud-panel" aria-label="Pannello informazioni di gioco">
         <header>
           <span>Cantiere attivo</span>
-          <strong id="missionTitle">Deposito Binario 01</strong>
+          <strong id="statusText">In attesa operatore</strong>
         </header>
         <div class="hud-stats">
           <p><span>Mezzo</span><strong id="vehicleText">A piedi</strong></p>
           <p><span>Energia</span><strong id="energyText">100%</strong></p>
           <p><span>Avanzamento</span><strong id="progressText">0%</strong></p>
         </div>
-        <div class="hud-progress" aria-hidden="true"><span id="progressBar"></span></div>
-        <p id="objectiveText">Sali sull'escavatore e inizia a scavare lungo il binario.</p>
+        <div class="hud-progress" aria-label="Avanzamento missione"><span id="progressBar"></span></div>
+        <ol id="taskList" class="task-list" aria-label="Obiettivi missione"></ol>
       </section>
 
-      <div id="hintBubble" class="hint-bubble">Premi E/ENTRA per salire sull'escavatore</div>
+      <aside class="mini-map" aria-label="Mini mappa cantiere">
+        <span class="mini-track"></span>
+        <span id="miniPlayer" class="mini-dot operator"></span>
+        <span id="miniVehicle" class="mini-dot vehicle"></span>
+        <span class="mini-target"></span>
+      </aside>
+
+      <div id="vehicleMarker" class="vehicle-marker excavator" aria-label="Escavatore selezionabile">
+        <span class="marker-cabin"></span>
+        <span class="marker-track"></span>
+        <span class="marker-arm"></span>
+        <span class="marker-bucket"></span>
+      </div>
+
+      <div id="workerMarker" class="worker-marker" aria-label="Operatore di cantiere">
+        <span class="helmet"></span>
+        <span class="body"></span>
+      </div>
+
+      <div id="workZone" class="work-zone" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+
+      <div id="hintBubble" class="hint-bubble">Avvicinati all'escavatore e premi ENTRA.</div>
+
+      <section id="completionBanner" class="completion-banner" hidden>
+        <p>Missione completata</p>
+        <strong>Binario pronto alla consegna</strong>
+      </section>
 
       <nav class="controls" aria-label="Comandi di gioco">
         <div id="joystick" class="joystick" role="group" aria-label="Joystick direzionale">
@@ -50,7 +82,7 @@
         </div>
 
         <div class="action-cluster">
-          <button id="actionButton" class="gold-button primary-action" type="button">SCAVA</button>
+          <button id="actionButton" class="gold-button primary-action" type="button">ENTRA</button>
           <button id="boostButton" class="gold-button" type="button">BOOST</button>
           <button id="cameraButton" class="gold-button" type="button">CAM</button>
           <button id="menuButton" class="gold-button menu-action" type="button">MENU</button>
@@ -60,9 +92,11 @@
       <dialog id="menuDialog" class="menu-dialog" aria-label="Menu principale">
         <form method="dialog">
           <h1>Binario The Game</h1>
-          <p>Grafica riscritta in stile simulatore mobile: cantiere realistico, HUD compatto, joystick metallico e pulsanti gialli.</p>
-          <button id="newGameButton" class="gold-button" value="new-game">NUOVA PARTITA</button>
-          <button class="dark-button" value="close">CHIUDI</button>
+          <p>Simulatore mobile di cantiere ferroviario: guida l'operatore, sali sull'escavatore, completa le lavorazioni e consegna il binario.</p>
+          <div class="menu-actions">
+            <button id="newGameButton" class="gold-button" value="new-game">NUOVA PARTITA</button>
+            <button class="dark-button" value="close">CHIUDI</button>
+          </div>
         </form>
       </dialog>
     </section>
