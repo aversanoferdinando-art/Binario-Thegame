@@ -22,6 +22,14 @@ Il progetto è stato riscritto come mockup giocabile in stile simulatore mobile:
 | Cambia camera | CAM | `C` |
 | Menu / Pausa | MENU | `Esc` |
 
+## Controllo conflitti
+
+Prima di pubblicare o unire modifiche, esegui il controllo locale che cerca marker di merge, ID HTML duplicati e asset locali mancanti:
+
+```bash
+node scripts/check-conflicts.mjs
+```
+
 ## Avvio locale
 
 Apri `index.html` in un browser moderno oppure servi la cartella con un server statico:
