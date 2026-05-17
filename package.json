@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "check": "node scripts/check-conflicts.mjs && node --check main.js && node scripts/smoke-test.mjs"
+  }
+}

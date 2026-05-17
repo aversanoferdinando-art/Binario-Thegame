@@ -24,7 +24,13 @@ Il progetto è stato riscritto come mockup giocabile in stile simulatore mobile:
 
 ## Controllo conflitti
 
-Prima di pubblicare o unire modifiche, esegui il controllo locale che cerca marker di merge, ID HTML duplicati e asset locali mancanti:
+Prima di pubblicare o unire modifiche, esegui la suite locale completa:
+
+```bash
+npm run check
+```
+
+Il comando controlla marker di merge, ID HTML duplicati, asset locali mancanti, sintassi JavaScript e flusso eseguibile del menu/gioco. Se vuoi eseguire solo il controllo conflitti:
 
 ```bash
 node scripts/check-conflicts.mjs
