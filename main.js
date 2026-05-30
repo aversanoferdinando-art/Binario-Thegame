@@ -70,6 +70,7 @@ const elements = {
 
 const state = createInitialState();
 let tickTimer = 0;
+let joystickTimer = 0;
 
 function createInitialState() {
   return {
@@ -80,13 +81,13 @@ function createInitialState() {
     cameraMode: 1,
     boostedUntil: 0,
     shiftMinutes: 390,
-    boardingRadius: 14,
-    operator: { x: 62, y: 66 },
+    boardingRadius: 16,
+    operator: { x: 58, y: 59 },
     excavator: { x: 52, y: 47 },
     workZone: { x: 48, y: 55 },
     work: { excavation: 0, leveling: 0, inspection: 0 },
     lastTaskCount: 0,
-    hint: "Avvicinati all'escavatore e premi ENTRA."
+    hint: "Premi ENTRA per salire sull'escavatore e iniziare."
   };
 }
 
@@ -169,7 +170,7 @@ function render() {
   elements.shiftText.textContent = formatShift(state.shiftMinutes);
   elements.statusText.textContent = state.completed ? 'Consegnato' : activeTask().label;
   elements.actionButton.textContent = state.completed ? 'FATTO' : state.inVehicle ? 'LAVORA' : 'ENTRA';
-  elements.actionButton.disabled = state.completed || (!state.inVehicle && !nearVehicle);
+  elements.actionButton.disabled = state.completed;
   elements.boostButton.disabled = state.energy < 18 || state.completed;
   elements.workerMarker.classList.toggle('ghosted', state.inVehicle);
   elements.root.classList.toggle('boosted', isBoosted);
@@ -184,13 +185,12 @@ function enterOrExitVehicle() {
   const nearVehicle = distance(state.operator, state.excavator) <= state.boardingRadius;
 
   if (state.completed) {
-    setHint('Missione già completata: apri MENU per ripartire.');
+    setHint('Missione gia completata: apri MENU per ripartire.');
     return;
   }
 
   if (!state.inVehicle && !nearVehicle) {
-    setHint("Sei troppo lontano: usa il joystick e avvicinati all'escavatore.");
-    return;
+    state.operator = { ...state.excavator };
   }
 
   state.inVehicle = !state.inVehicle;
@@ -217,7 +217,7 @@ function performWork() {
   }
 
   if (state.completed) {
-    setHint('Cantiere già consegnato.');
+    setHint('Cantiere gia consegnato.');
     return;
   }
 
@@ -267,7 +267,7 @@ function boost() {
 
   state.energy = clamp(state.energy - 18, 0, 100);
   state.boostedUntil = Date.now() + 3300;
-  setHint('BOOST attivo: lavorazione più rapida per pochi secondi.');
+  setHint('BOOST attivo: lavorazione piu rapida per pochi secondi.');
   render();
 }
 
@@ -285,6 +285,7 @@ function resetGame() {
   elements.railBg.style.objectPosition = CAMERA_POSITIONS[0];
   elements.root.classList.remove('boosted');
   setHint(state.hint);
+  stopJoystick();
   render();
 }
 
@@ -309,9 +310,7 @@ function move(direction, continuous = false) {
   elements.joyKnob.style.transform = `translate(${vector.x * 18}px, ${vector.y * 18}px)`;
 
   if (!continuous) {
-    window.setTimeout(() => {
-      elements.joyKnob.style.transform = 'translate(0, 0)';
-    }, 160);
+    window.setTimeout(stopJoystick, 160);
   }
 
   const nearVehicle = distance(state.operator, state.excavator) <= state.boardingRadius;
@@ -324,6 +323,20 @@ function move(direction, continuous = false) {
   }
 
   render();
+}
+
+function startJoystick(direction) {
+  stopJoystick();
+  move(direction, true);
+  joystickTimer = window.setInterval(() => move(direction, true), 170);
+}
+
+function stopJoystick() {
+  if (joystickTimer) {
+    window.clearInterval(joystickTimer);
+    joystickTimer = 0;
+  }
+  elements.joyKnob.style.transform = 'translate(0, 0)';
 }
 
 function openMenu() {
@@ -368,27 +381,46 @@ function bindControls() {
     closeMenuAfterReset();
   });
 
-  elements.joystick.addEventListener('click', (event) => {
+  elements.joystick.addEventListener('pointerdown', (event) => {
     const button = event.target.closest('[data-direction]');
-    if (button) move(button.dataset.direction);
+    if (!button) return;
+    event.preventDefault();
+    button.setPointerCapture?.(event.pointerId);
+    startJoystick(button.dataset.direction);
   });
+  elements.joystick.addEventListener('pointerup', stopJoystick);
+  elements.joystick.addEventListener('pointercancel', stopJoystick);
+  elements.joystick.addEventListener('pointerleave', stopJoystick);
 
   document.addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
-    if (['arrowup', 'w'].includes(key)) move('up', true);
-    if (['arrowright', 'd'].includes(key)) move('right', true);
-    if (['arrowdown', 's'].includes(key)) move('down', true);
-    if (['arrowleft', 'a'].includes(key)) move('left', true);
+    if (['arrowup', 'w'].includes(key)) {
+      event.preventDefault();
+      move('up', true);
+    }
+    if (['arrowright', 'd'].includes(key)) {
+      event.preventDefault();
+      move('right', true);
+    }
+    if (['arrowdown', 's'].includes(key)) {
+      event.preventDefault();
+      move('down', true);
+    }
+    if (['arrowleft', 'a'].includes(key)) {
+      event.preventDefault();
+      move('left', true);
+    }
     if (key === 'e' || key === 'enter') enterOrExitVehicle();
-    if (key === ' ' || key === 'x') performWork();
+    if (key === ' ' || key === 'x') {
+      event.preventDefault();
+      performWork();
+    }
     if (key === 'b') boost();
     if (key === 'c') switchCamera();
     if (key === 'escape') openMenu();
   });
 
-  document.addEventListener('keyup', () => {
-    elements.joyKnob.style.transform = 'translate(0, 0)';
-  });
+  document.addEventListener('keyup', stopJoystick);
 }
 
 bindControls();
