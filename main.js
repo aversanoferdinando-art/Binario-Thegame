@@ -1,429 +1,218 @@
-const TASKS = [
-  {
-    id: 'reach',
-    label: "Raggiungi l'escavatore",
-    complete: (state) => distance(state.operator, state.excavator) <= state.boardingRadius
-  },
-  {
-    id: 'board',
-    label: 'Sali sul mezzo operativo',
-    complete: (state) => state.inVehicle
-  },
-  {
-    id: 'excavate',
-    label: 'Scava la trincea lungo il binario',
-    target: 45,
-    complete: (state) => state.work.excavation >= 45
-  },
-  {
-    id: 'level',
-    label: 'Livella il ballast con passate controllate',
-    target: 35,
-    complete: (state) => state.work.leveling >= 35
-  },
-  {
-    id: 'inspect',
-    label: 'Conferma ispezione finale',
-    target: 20,
-    complete: (state) => state.work.inspection >= 20
-  }
+import { SimCamera } from './world/camera.js';
+import { SiteRenderer } from './world/rendering.js';
+import { SimulationWorld } from './world/world.js';
+import { RailRoadExcavator } from './vehicles/excavator.js';
+import { Vaiacar } from './vehicles/vaiacar.js';
+import { BallastTamper } from './vehicles/tamper.js';
+import { ConstructionSystem } from './construction/constructionSystem.js';
+import { JobManager } from './jobs/jobManager.js';
+import { EconomyManager } from './economy/economyManager.js';
+import { CoOpDirector } from './multiplayer/coOpDirector.js';
+import { AudioSystem } from './audio/audioSystem.js';
+import { HUD } from './ui/hud.js';
+
+const canvas = document.getElementById('simCanvas');
+const camera = new SimCamera();
+const renderer = new SiteRenderer(canvas, camera);
+const world = new SimulationWorld();
+const construction = new ConstructionSystem();
+const jobs = new JobManager(construction);
+const economy = new EconomyManager();
+const coop = new CoOpDirector();
+const audio = new AudioSystem();
+
+const vehicles = [
+  new RailRoadExcavator(),
+  new Vaiacar(),
+  new BallastTamper()
 ];
 
-const DIRECTIONS = {
-  up: { x: 0, y: -1 },
-  right: { x: 1, y: 0 },
-  down: { x: 0, y: 1 },
-  left: { x: -1, y: 0 }
-};
+let selectedVehicle = vehicles[0];
+let lastTime = performance.now();
+let toolHeld = false;
+let joystickDir = null;
+let lastProgress = construction.totalProgress;
 
-const CAMERA_POSITIONS = ['50% 18%', '54% 36%', '48% 58%'];
+const keys = new Set();
+const hud = new HUD();
 
-const elements = {
-  root: document.getElementById('playfield'),
-  railBg: document.getElementById('railBg'),
-  hudButton: document.getElementById('hudButton'),
-  hudPanel: document.getElementById('hudPanel'),
-  hintBubble: document.getElementById('hintBubble'),
-  vehicleText: document.getElementById('vehicleText'),
-  energyText: document.getElementById('energyText'),
-  progressText: document.getElementById('progressText'),
-  progressBar: document.getElementById('progressBar'),
-  actionButton: document.getElementById('actionButton'),
-  boostButton: document.getElementById('boostButton'),
-  cameraButton: document.getElementById('cameraButton'),
-  menuButton: document.getElementById('menuButton'),
-  newGameButton: document.getElementById('newGameButton'),
-  menuDialog: document.getElementById('menuDialog'),
-  joystick: document.getElementById('joystick'),
-  joyKnob: document.getElementById('joyKnob'),
-  workerMarker: document.getElementById('workerMarker'),
-  vehicleMarker: document.getElementById('vehicleMarker'),
-  workZone: document.getElementById('workZone'),
-  miniPlayer: document.getElementById('miniPlayer'),
-  miniVehicle: document.getElementById('miniVehicle'),
-  taskList: document.getElementById('taskList'),
-  completionBanner: document.getElementById('completionBanner'),
-  scoreText: document.getElementById('scoreText'),
-  shiftText: document.getElementById('shiftText'),
-  statusText: document.getElementById('statusText')
-};
-
-const state = createInitialState();
-let tickTimer = 0;
-let joystickTimer = 0;
-
-function createInitialState() {
-  return {
-    inVehicle: false,
-    completed: false,
-    energy: 100,
-    score: 0,
-    cameraMode: 1,
-    boostedUntil: 0,
-    shiftMinutes: 390,
-    boardingRadius: 16,
-    operator: { x: 58, y: 59 },
-    excavator: { x: 52, y: 47 },
-    workZone: { x: 48, y: 55 },
-    work: { excavation: 0, leveling: 0, inspection: 0 },
-    lastTaskCount: 0,
-    hint: "Premi ENTRA per salire sull'escavatore e iniziare."
-  };
+function resize() {
+  renderer.resize();
 }
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function distance(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function missionProgress() {
-  const workProgress = state.work.excavation + state.work.leveling + state.work.inspection;
-  return clamp(Math.round(workProgress), 0, 100);
-}
-
-function completedTasks() {
-  return TASKS.filter((task) => task.complete(state));
-}
-
-function activeTask() {
-  return TASKS.find((task) => !task.complete(state)) || TASKS[TASKS.length - 1];
-}
-
-function formatShift(minutes) {
-  const hours = Math.floor(minutes / 60).toString().padStart(2, '0');
-  const mins = Math.floor(minutes % 60).toString().padStart(2, '0');
-  return `Turno ${hours}:${mins}`;
-}
-
-function setHint(message) {
-  state.hint = message;
-  elements.hintBubble.textContent = message;
-}
-
-function setPosition(element, point) {
-  element.style.left = `${point.x}%`;
-  element.style.top = `${point.y}%`;
-}
-
-function syncMiniMap() {
-  elements.miniPlayer.style.left = `${state.operator.x}%`;
-  elements.miniPlayer.style.top = `${state.operator.y}%`;
-  elements.miniVehicle.style.left = `${state.excavator.x}%`;
-  elements.miniVehicle.style.top = `${state.excavator.y}%`;
-}
-
-function renderTaskList() {
-  const active = activeTask();
-  elements.taskList.innerHTML = TASKS.map((task) => {
-    const done = task.complete(state);
-    const activeClass = task.id === active.id && !done ? 'active' : '';
-    const doneClass = done ? 'done' : '';
-    return `<li class="${doneClass} ${activeClass}"><span></span>${task.label}</li>`;
-  }).join('');
-}
-
-function render() {
-  const progress = missionProgress();
-  const doneCount = completedTasks().length;
-  const isBoosted = Date.now() < state.boostedUntil;
-  const nearVehicle = distance(state.operator, state.excavator) <= state.boardingRadius;
-  const canWork = state.inVehicle && !state.completed;
-
-  if (doneCount > state.lastTaskCount) {
-    state.score += (doneCount - state.lastTaskCount) * 120;
-    state.lastTaskCount = doneCount;
-  }
-
-  setPosition(elements.workerMarker, state.operator);
-  setPosition(elements.vehicleMarker, state.excavator);
-  setPosition(elements.workZone, state.workZone);
-  syncMiniMap();
-
-  elements.vehicleText.textContent = state.inVehicle ? 'Escavatore DX-12' : 'A piedi';
-  elements.energyText.textContent = `${Math.round(state.energy)}%`;
-  elements.progressText.textContent = `${progress}%`;
-  elements.progressBar.style.width = `${progress}%`;
-  elements.scoreText.textContent = state.score.toString();
-  elements.shiftText.textContent = formatShift(state.shiftMinutes);
-  elements.statusText.textContent = state.completed ? 'Consegnato' : activeTask().label;
-  elements.actionButton.textContent = state.completed ? 'FATTO' : state.inVehicle ? 'LAVORA' : 'ENTRA';
-  elements.actionButton.disabled = state.completed;
-  elements.boostButton.disabled = state.energy < 18 || state.completed;
-  elements.workerMarker.classList.toggle('ghosted', state.inVehicle);
-  elements.root.classList.toggle('boosted', isBoosted);
-  elements.root.classList.toggle('near-vehicle', nearVehicle && !state.inVehicle);
-  elements.workZone.classList.toggle('active', canWork);
-  elements.completionBanner.hidden = !state.completed;
-
-  renderTaskList();
-}
-
-function enterOrExitVehicle() {
-  const nearVehicle = distance(state.operator, state.excavator) <= state.boardingRadius;
-
-  if (state.completed) {
-    setHint('Missione gia completata: apri MENU per ripartire.');
-    return;
-  }
-
-  if (!state.inVehicle && !nearVehicle) {
-    state.operator = { ...state.excavator };
-  }
-
-  state.inVehicle = !state.inVehicle;
-  if (state.inVehicle) {
-    state.operator = { ...state.excavator };
-    setHint('Sei a bordo: premi LAVORA per avanzare nella missione.');
-  } else {
-    state.operator = { x: clamp(state.excavator.x + 8, 8, 92), y: clamp(state.excavator.y + 10, 16, 82) };
-    setHint("Sei sceso dal mezzo. Premi ENTRA per risalire quando sei vicino.");
-  }
-
-  render();
-}
-
-function workIncrement() {
-  const boosted = Date.now() < state.boostedUntil;
-  return boosted ? 12 : 7;
-}
-
-function performWork() {
-  if (!state.inVehicle) {
-    enterOrExitVehicle();
-    return;
-  }
-
-  if (state.completed) {
-    setHint('Cantiere gia consegnato.');
-    return;
-  }
-
-  if (state.energy <= 0) {
-    setHint('Energia esaurita: attendi qualche secondo per recuperare.');
-    return;
-  }
-
-  const increment = workIncrement();
-  const energyCost = Date.now() < state.boostedUntil ? 4 : 6;
-
-  if (state.work.excavation < 45) {
-    state.work.excavation = clamp(state.work.excavation + increment, 0, 45);
-    setHint('Scavo in corso: la trincea si apre lungo il binario.');
-  } else if (state.work.leveling < 35) {
-    state.work.leveling = clamp(state.work.leveling + increment, 0, 35);
-    setHint('Ballast livellato: mantieni passate regolari.');
-  } else if (state.work.inspection < 20) {
-    state.work.inspection = clamp(state.work.inspection + increment, 0, 20);
-    setHint('Ispezione finale: verifica profilo e area di sicurezza.');
-  }
-
-  state.energy = clamp(state.energy - energyCost, 0, 100);
-  state.score += Date.now() < state.boostedUntil ? 35 : 20;
-
-  if (missionProgress() >= 100) {
-    completeMission();
-  }
-
-  render();
-}
-
-function completeMission() {
-  state.completed = true;
-  state.score += Math.round(state.energy) * 3 + 500;
-  setHint('Missione completata al 100%: binario pronto alla consegna.');
-}
-
-function boost() {
-  if (state.completed) return;
-
-  if (state.energy < 18) {
-    setHint('Energia insufficiente per il boost.');
-    render();
-    return;
-  }
-
-  state.energy = clamp(state.energy - 18, 0, 100);
-  state.boostedUntil = Date.now() + 3300;
-  setHint('BOOST attivo: lavorazione piu rapida per pochi secondi.');
-  render();
-}
-
-function switchCamera() {
-  state.cameraMode = state.cameraMode === CAMERA_POSITIONS.length ? 1 : state.cameraMode + 1;
-  elements.railBg.style.objectPosition = CAMERA_POSITIONS[state.cameraMode - 1];
-  setHint(`Camera ${state.cameraMode}: visuale cantiere aggiornata.`);
-}
-
-function resetGame() {
-  const fresh = createInitialState();
-  Object.keys(state).forEach((key) => {
-    state[key] = fresh[key];
+function selectVehicle(id) {
+  selectedVehicle = vehicles.find((vehicle) => vehicle.id === id) || selectedVehicle;
+  coop.assignRoleForVehicle(id);
+  document.querySelectorAll('.fleet-button').forEach((button) => {
+    button.classList.toggle('active', button.dataset.vehicle === id);
   });
-  elements.railBg.style.objectPosition = CAMERA_POSITIONS[0];
-  elements.root.classList.remove('boosted');
-  setHint(state.hint);
-  stopJoystick();
-  render();
+  hud.showToast(`${selectedVehicle.name} selezionato`);
 }
 
-function move(direction, continuous = false) {
-  const vector = DIRECTIONS[direction];
-  if (!vector || state.completed) return;
+function toggleEnter() {
+  for (const vehicle of vehicles) vehicle.operatorInside = false;
+  selectedVehicle.operatorInside = !selectedVehicle.operatorInside;
+  if (selectedVehicle.operatorInside) {
+    world.radio(`Caposquadra: operatore a bordo su ${selectedVehicle.radioName}.`);
+    hud.showToast(`A bordo: ${selectedVehicle.radioName}`);
+  } else {
+    world.radio(`Caposquadra: operatore sceso da ${selectedVehicle.radioName}.`);
+    hud.showToast('Operatore a terra');
+  }
+}
 
-  const speed = state.inVehicle ? 3.2 : 4.4;
-  const current = state.inVehicle ? state.excavator : state.operator;
-  const next = {
-    x: clamp(current.x + vector.x * speed, 8, 92),
-    y: clamp(current.y + vector.y * speed, 16, 82)
+function inputForVehicle(vehicle) {
+  if (!vehicle.operatorInside) return { throttle: 0, brake: 1, steer: 0 };
+  let throttle = 0;
+  let brake = 0;
+  let steer = 0;
+  if (keys.has('arrowup') || keys.has('w') || joystickDir === 'forward') throttle += 1;
+  if (keys.has('arrowdown') || keys.has('s') || joystickDir === 'reverse') throttle -= 0.45;
+  if (keys.has('shift')) brake = 1;
+  if (keys.has('arrowleft') || keys.has('a') || joystickDir === 'left') steer -= 1;
+  if (keys.has('arrowright') || keys.has('d') || joystickDir === 'right') steer += 1;
+  return { throttle, brake, steer };
+}
+
+function setJoystickVisual(dir) {
+  const knob = document.getElementById('joyKnob');
+  const offsets = {
+    forward: 'translate(0, -22px)',
+    reverse: 'translate(0, 22px)',
+    left: 'translate(-22px, 0)',
+    right: 'translate(22px, 0)'
   };
-
-  if (state.inVehicle) {
-    state.excavator = next;
-    state.operator = { ...next };
-  } else {
-    state.operator = next;
-  }
-
-  elements.joyKnob.style.transform = `translate(${vector.x * 18}px, ${vector.y * 18}px)`;
-
-  if (!continuous) {
-    window.setTimeout(stopJoystick, 160);
-  }
-
-  const nearVehicle = distance(state.operator, state.excavator) <= state.boardingRadius;
-  if (!state.inVehicle && nearVehicle) {
-    setHint("Sei vicino all'escavatore: premi ENTRA.");
-  } else if (state.inVehicle) {
-    setHint('Mezzo in posizione: usa LAVORA sul binario.');
-  } else {
-    setHint(`Movimento ${direction}: raggiungi il mezzo operativo.`);
-  }
-
-  render();
-}
-
-function startJoystick(direction) {
-  stopJoystick();
-  move(direction, true);
-  joystickTimer = window.setInterval(() => move(direction, true), 170);
-}
-
-function stopJoystick() {
-  if (joystickTimer) {
-    window.clearInterval(joystickTimer);
-    joystickTimer = 0;
-  }
-  elements.joyKnob.style.transform = 'translate(0, 0)';
-}
-
-function openMenu() {
-  if (typeof elements.menuDialog.showModal === 'function') {
-    elements.menuDialog.showModal();
-  } else {
-    elements.menuDialog.setAttribute('open', '');
-  }
-}
-
-function closeMenuAfterReset() {
-  if (elements.menuDialog.open) {
-    elements.menuDialog.close('new-game');
-  }
-}
-
-function tick() {
-  if (!state.completed) {
-    state.shiftMinutes = clamp(state.shiftMinutes + 0.25, 390, 720);
-    if (!state.inVehicle || Date.now() >= state.boostedUntil) {
-      state.energy = clamp(state.energy + 0.8, 0, 100);
-    }
-  }
-  render();
+  knob.style.transform = offsets[dir] || 'translate(0, 0)';
 }
 
 function bindControls() {
-  elements.hudButton.addEventListener('click', () => {
-    const isOpen = elements.hudPanel.classList.toggle('open');
-    elements.hudButton.setAttribute('aria-expanded', String(isOpen));
-  });
-
-  elements.actionButton.addEventListener('click', () => {
-    if (state.inVehicle) performWork();
-    else enterOrExitVehicle();
-  });
-  elements.boostButton.addEventListener('click', boost);
-  elements.cameraButton.addEventListener('click', switchCamera);
-  elements.menuButton.addEventListener('click', openMenu);
-  elements.newGameButton.addEventListener('click', () => {
-    resetGame();
-    closeMenuAfterReset();
-  });
-
-  elements.joystick.addEventListener('pointerdown', (event) => {
-    const button = event.target.closest('[data-direction]');
-    if (!button) return;
-    event.preventDefault();
-    button.setPointerCapture?.(event.pointerId);
-    startJoystick(button.dataset.direction);
-  });
-  elements.joystick.addEventListener('pointerup', stopJoystick);
-  elements.joystick.addEventListener('pointercancel', stopJoystick);
-  elements.joystick.addEventListener('pointerleave', stopJoystick);
-
-  document.addEventListener('keydown', (event) => {
+  window.addEventListener('resize', resize);
+  window.addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
-    if (['arrowup', 'w'].includes(key)) {
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'w', 'a', 's', 'd'].includes(key)) {
       event.preventDefault();
-      move('up', true);
     }
-    if (['arrowright', 'd'].includes(key)) {
-      event.preventDefault();
-      move('right', true);
-    }
-    if (['arrowdown', 's'].includes(key)) {
-      event.preventDefault();
-      move('down', true);
-    }
-    if (['arrowleft', 'a'].includes(key)) {
-      event.preventDefault();
-      move('left', true);
-    }
-    if (key === 'e' || key === 'enter') enterOrExitVehicle();
-    if (key === ' ' || key === 'x') {
-      event.preventDefault();
-      performWork();
-    }
-    if (key === 'b') boost();
-    if (key === 'c') switchCamera();
-    if (key === 'escape') openMenu();
+    keys.add(key);
+    if (key === '1') selectVehicle('excavator');
+    if (key === '2') selectVehicle('vaiacar');
+    if (key === '3') selectVehicle('tamper');
+    if (key === 'e') toggleEnter();
+    if (key === 'm') toggleEngine();
+    if (key === 'r') toggleRailGear();
+    if (key === 'c') camera.cycleMode();
+    if (key === ' ') toolHeld = true;
+  });
+  window.addEventListener('keyup', (event) => {
+    const key = event.key.toLowerCase();
+    keys.delete(key);
+    if (key === ' ') toolHeld = false;
   });
 
-  document.addEventListener('keyup', stopJoystick);
+  document.querySelectorAll('.fleet-button').forEach((button) => {
+    button.addEventListener('click', () => {
+      audio.enable();
+      selectVehicle(button.dataset.vehicle);
+    });
+  });
+
+  document.getElementById('enterButton').addEventListener('click', () => {
+    audio.enable();
+    toggleEnter();
+  });
+  document.getElementById('engineButton').addEventListener('click', () => {
+    audio.enable();
+    toggleEngine();
+  });
+  document.getElementById('railGearButton').addEventListener('click', () => {
+    audio.enable();
+    toggleRailGear();
+  });
+  document.getElementById('toolButton').addEventListener('pointerdown', () => {
+    audio.enable();
+    toolHeld = true;
+  });
+  document.getElementById('toolButton').addEventListener('pointerup', () => { toolHeld = false; });
+  document.getElementById('toolButton').addEventListener('pointercancel', () => { toolHeld = false; });
+  document.getElementById('cameraButton').addEventListener('click', () => camera.cycleMode());
+  document.getElementById('radioButton').addEventListener('click', () => {
+    audio.enable();
+    audio.radioBeep();
+    world.radio(`Radio ${selectedVehicle.radioName}: posizione ${Math.round(selectedVehicle.y)} m, fase ${construction.activePhase.label}.`);
+  });
+
+  document.querySelectorAll('#joystick button').forEach((button) => {
+    button.addEventListener('pointerdown', (event) => {
+      audio.enable();
+      event.preventDefault();
+      joystickDir = button.dataset.dir;
+      button.setPointerCapture?.(event.pointerId);
+      setJoystickVisual(joystickDir);
+    });
+    button.addEventListener('pointerup', () => {
+      joystickDir = null;
+      setJoystickVisual(null);
+    });
+    button.addEventListener('pointercancel', () => {
+      joystickDir = null;
+      setJoystickVisual(null);
+    });
+  });
 }
 
+function toggleEngine() {
+  selectedVehicle.toggleEngine();
+  world.radio(`${selectedVehicle.radioName}: motore ${selectedVehicle.engineOn ? 'avviato' : 'arrestato'}.`);
+  hud.showToast(selectedVehicle.engineOn ? 'Motore diesel avviato' : 'Motore spento');
+}
+
+function toggleRailGear() {
+  selectedVehicle.toggleRailGear();
+  world.radio(`${selectedVehicle.radioName}: ruote ferroviarie ${selectedVehicle.railGearDown ? 'abbassate' : 'sollevate'}.`);
+  hud.showToast(selectedVehicle.railGearDown ? 'Assetto ferro attivo' : 'Assetto gomma attivo');
+}
+
+function update(dt) {
+  world.update(dt);
+  for (const vehicle of vehicles) {
+    vehicle.setInput(vehicle === selectedVehicle ? inputForVehicle(vehicle) : { throttle: 0, brake: 0.35, steer: 0 });
+    vehicle.update(dt, world.railNetwork);
+    if (vehicle !== selectedVehicle) vehicle.stopTool();
+  }
+
+  if (toolHeld) {
+    const result = selectedVehicle.operate(construction, world, dt);
+    if (result && !result.ok && Math.random() < 0.035) hud.showToast(result.message);
+  } else {
+    selectedVehicle.stopTool();
+  }
+
+  const progressDelta = construction.totalProgress - lastProgress;
+  if (progressDelta > 0) {
+    economy.reward(progressDelta);
+    lastProgress = construction.totalProgress;
+  }
+  economy.update(dt, vehicles);
+  audio.update(selectedVehicle, world);
+  camera.update(selectedVehicle, dt);
+}
+
+function render() {
+  world.render(renderer, vehicles, selectedVehicle);
+  hud.update({ world, vehicles, selectedVehicle, construction, jobManager: jobs, coop, economy });
+}
+
+function frame(now) {
+  const dt = Math.min(0.033, (now - lastTime) / 1000 || 0.016);
+  lastTime = now;
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+
+resize();
 bindControls();
-render();
-tickTimer = window.setInterval(tick, 1000);
-window.addEventListener('pagehide', () => window.clearInterval(tickTimer));
+selectedVehicle.operatorInside = true;
+selectedVehicle.engineOn = true;
+world.radio('Caposquadra: Fase 1 caricata. Mezzi pronti, binario 2 da rinnovare.');
+hud.showToast('Fase 1 simulatore caricata');
+requestAnimationFrame(frame);

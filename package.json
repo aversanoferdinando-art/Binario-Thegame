@@ -1,0 +1,10 @@
+{
+  "name": "binario-to-game",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "check": "node --check main.js",
+    "smoke": "node tools/smoke-test.js"
+  }
+}
