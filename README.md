@@ -1,31 +1,57 @@
-# Binario The Game - Cantiere Mobile
+# BINARIO TO GAME
 
-Mockup giocabile in stile simulatore mobile per un cantiere ferroviario. La schermata verticale usa lo sfondo del cantiere, HUD apribile, mini-mappa, joystick metallico e pulsanti gialli in stile macchina operatrice.
+Simulatore professionale web di armamento ferroviario italiano. La Fase 1 sostituisce il vecchio mockup mobile con una base modulare giocabile: cantiere ferroviario esteso, tre binari principali, scambi, stazione, piazzale operativo, mezzi pesanti e sequenza lavori tecnica.
 
-## Stato della riscrittura
+## Fase 1
 
-- Nessun marker di conflitto Git residuo nei file sorgente.
-- ID HTML e selettori JavaScript allineati in un unico flusso di gioco.
-- UI mobile riorganizzata con topbar, HUD missione, mini-mappa, area di lavoro e banner di completamento.
-- Loop completo: raggiungi l'escavatore, sali a bordo, scava, livella, ispeziona e consegna il binario.
+- Mappa ferroviaria procedurale con stazione, officina, magazzino, piazzale materiali, illuminazione e vegetazione.
+- Tre binari paralleli con ballast, traverse, rotaie, scambi, usura, erbacce, guasti e geometria dinamica.
+- Mezzi giocabili: escavatore gomma/rotaia, Vaiacar e rincalzatrice.
+- Fisica pesante con massa, inerzia, freno, ruote ferroviarie, aderenza, vibrazioni e idraulica.
+- Ciclo giorno/notte, meteo, treni AI, operai AI, radio cantiere e HUD tecnico.
+- Sequenza lavori: isolamento, scavo, rimozione ballast, traverse, rotaie, rincalzatura, correzione geometria e collaudo.
+
+## Architettura
+
+```text
+/audio
+/construction
+/core
+/economy
+/jobs
+/multiplayer
+/physics
+/rail_system
+/tools
+/ui
+/vehicles
+/world
+```
 
 ## Comandi
 
-| Azione | Touch / Mouse | Tastiera |
+| Azione | Tastiera | UI |
 | --- | --- | --- |
-| Muovi operatore o escavatore | Joystick | Frecce o `WASD` |
-| Entra o scendi dall'escavatore | ENTRA / LAVORA quando sei a piedi | `E` o `Invio` |
-| Lavora sul binario | LAVORA | `Spazio` o `X` |
-| Boost temporaneo | BOOST | `B` |
-| Cambia camera | CAM | `C` |
-| Menu | MENU | `Esc` |
+| Seleziona escavatore / Vaiacar / rincalzatrice | `1`, `2`, `3` | pulsanti flotta |
+| Sali o scendi | `E` | SALI / SCENDI |
+| Motore | `M` | MOTORE |
+| Ruote ferroviarie | `R` | RUOTE FERRO |
+| Movimento | `WASD` / frecce | joystick |
+| Lavorazione | `Spazio` | LAVORA tenuto premuto |
+| Camera | `C` | CAM |
 
 ## Avvio locale
 
-Apri `index.html` in un browser moderno oppure servi la cartella con un server statico:
+Serve un server statico per i moduli JavaScript:
 
 ```bash
 python3 -m http.server 8000
 ```
 
 Poi visita `http://localhost:8000`.
+
+## Verifica
+
+```bash
+node tools/smoke-test.js
+```
