@@ -7,22 +7,50 @@ export class SimCamera {
     this.zoom = 1;
     this.mode = 0;
     this.shake = 0;
+    this.dragX = 0;
+    this.dragY = 0;
+    this.dragZoom = 0;
+    this.cinematic = 0;
   }
 
   cycleMode() {
     this.mode = (this.mode + 1) % 3;
   }
 
-  update(target, dt) {
-    const modes = [
-      { yOffset: -170, zoom: 1.08 },
-      { yOffset: -360, zoom: 0.76 },
-      { yOffset: -70, zoom: 1.42 }
-    ];
+  beginCinematic() {
+    this.cinematic = 1;
+  }
+
+  nudge(dx, dy) {
+    this.dragX = clamp(this.dragX + dx * 0.10, -42, 42);
+    this.dragY = clamp(this.dragY + dy * 0.18, -120, 120);
+  }
+
+  pinch(amount) {
+    this.dragZoom = clamp(this.dragZoom + amount, -0.26, 0.30);
+  }
+
+  update(target, dt, context = {}) {
+    const onFoot = context.onFoot;
+    const modes = onFoot
+      ? [
+          { yOffset: -135, zoom: 1.22 },
+          { yOffset: -230, zoom: 0.98 },
+          { yOffset: -80, zoom: 1.45 }
+        ]
+      : [
+          { yOffset: -190, zoom: 1.06 },
+          { yOffset: -380, zoom: 0.72 },
+          { yOffset: -92, zoom: 1.36 }
+        ];
     const mode = modes[this.mode];
-    this.x = damp(this.x, target.x, 3.2, dt);
-    this.y = damp(this.y, target.y + mode.yOffset, 3.2, dt);
-    this.zoom = damp(this.zoom, mode.zoom, 2.4, dt);
+    this.cinematic = damp(this.cinematic, 0, 2.4, dt);
+    this.dragX = damp(this.dragX, 0, 0.32, dt);
+    this.dragY = damp(this.dragY, 0, 0.25, dt);
+    const entryZoom = this.cinematic * (onFoot ? -0.08 : 0.18);
+    this.x = damp(this.x, target.x + this.dragX, 3.2 + this.cinematic * 3.2, dt);
+    this.y = damp(this.y, target.y + mode.yOffset + this.dragY, 3.2 + this.cinematic * 3.2, dt);
+    this.zoom = damp(this.zoom, mode.zoom + this.dragZoom + entryZoom, 2.4 + this.cinematic * 3.4, dt);
     this.shake = clamp(target.vibration || 0, 0, 1.4);
   }
 

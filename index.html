@@ -11,55 +11,82 @@
   <main id="simRoot" class="sim-root" aria-label="BINARIO TO GAME">
     <canvas id="simCanvas" aria-label="Simulatore ferroviario professionale"></canvas>
 
-    <section class="hud top-hud" aria-label="Stato simulazione">
+    <section id="avatarGarage" class="avatar-garage" aria-label="Preparazione operatore">
+      <div class="avatar-card">
+        <span class="eyebrow">Operatore armamento</span>
+        <h1>BINARIO TO GAME</h1>
+        <label class="operator-name">
+          <span>Nome</span>
+          <input id="operatorNameInput" type="text" value="Ferroviere" maxlength="16" />
+        </label>
+        <div class="swatch-row" aria-label="Colore tuta">
+          <span>Tuta</span>
+          <button type="button" class="swatch active" data-style="suit" data-color="#f27a2b" style="--swatch:#f27a2b"></button>
+          <button type="button" class="swatch" data-style="suit" data-color="#1f8f68" style="--swatch:#1f8f68"></button>
+          <button type="button" class="swatch" data-style="suit" data-color="#325f9f" style="--swatch:#325f9f"></button>
+        </div>
+        <div class="swatch-row" aria-label="Colore casco">
+          <span>Casco</span>
+          <button type="button" class="swatch active" data-style="helmet" data-color="#f1c64b" style="--swatch:#f1c64b"></button>
+          <button type="button" class="swatch" data-style="helmet" data-color="#f6f3df" style="--swatch:#f6f3df"></button>
+          <button type="button" class="swatch" data-style="helmet" data-color="#ef6a5b" style="--swatch:#ef6a5b"></button>
+        </div>
+        <button id="startShiftButton" class="start-shift" type="button">INIZIA TURNO</button>
+      </div>
+    </section>
+
+    <section class="cinematic-hud" aria-label="HUD">
       <button id="hudToggle" class="hud-button" type="button">HUD</button>
-      <div class="mission-strip">
-        <span id="clockText">06:30</span>
-        <strong>BINARIO TO GAME</strong>
-        <small id="weatherText">meteo variabile</small>
+      <div class="mission-chip">
+        <strong>RINNOVO BINARIO 2</strong>
+        <span><span id="clockText">06:30</span> · <span id="weatherText">nebbia leggera</span></span>
       </div>
-      <div class="contract-strip">
-        <span>Appalto RFI-042</span>
-        <strong id="jobPhaseText">preparazione cantiere</strong>
-      </div>
+      <div id="modeChip" class="mode-chip">A TERRA</div>
     </section>
 
-    <section id="instrumentPanel" class="instrument-panel" aria-label="Strumenti mezzo">
-      <header>
-        <span id="roleText">Ruolo: caposquadra</span>
-        <strong id="vehicleNameText">Escavatore gomma/rotaia</strong>
-      </header>
-      <div class="instrument-grid">
-        <p><span>Velocita</span><strong id="speedText">0.0 km/h</strong></p>
-        <p><span>Motore</span><strong id="engineText">spento</strong></p>
-        <p><span>Idraulica</span><strong id="hydraulicText">0 bar</strong></p>
-        <p><span>Aderenza</span><strong id="gripText">100%</strong></p>
-        <p><span>Allineamento</span><strong id="alignmentText">0 mm</strong></p>
-        <p><span>Ballast</span><strong id="ballastText">stabile</strong></p>
-      </div>
-      <div class="mini-map" aria-label="GPS ferroviario">
-        <canvas id="miniMapCanvas"></canvas>
-      </div>
-    </section>
-
-    <section class="objective-panel" aria-label="Obiettivi di lavoro">
+    <section id="contextStrip" class="context-strip hidden" aria-label="Interazione contestuale">
       <div>
-        <span>Sequenza tecnica</span>
-        <strong id="objectiveText">Avvia il mezzo e porta l'escavatore sul binario 2.</strong>
+        <span id="contextHint">Escavatore gomma/rotaia</span>
+        <strong id="contextTitle">ENTRA</strong>
+      </div>
+      <button id="contextButton" class="context-button" type="button">ENTRA</button>
+    </section>
+
+    <section id="telemetryDock" class="telemetry-dock" aria-label="Telemetria compatta">
+      <div class="micro-widget">
+        <span>VEL</span>
+        <strong id="speedText">0.0</strong>
+      </div>
+      <div class="micro-widget">
+        <span>HYD</span>
+        <strong id="hydraulicText">0</strong>
+      </div>
+      <div class="micro-widget">
+        <span>FUEL</span>
+        <strong id="fuelText">100%</strong>
+      </div>
+      <div class="micro-widget">
+        <span>GEO</span>
+        <strong id="alignmentText">0</strong>
+      </div>
+      <div class="micro-widget">
+        <span>BST</span>
+        <strong id="ballastText">OK</strong>
+      </div>
+    </section>
+
+    <section id="missionWidget" class="mission-widget" aria-label="Missione">
+      <div>
+        <span id="jobPhaseText">Isolamento cantiere</span>
+        <strong id="objectiveText">Raggiungi l'escavatore e sali a bordo.</strong>
       </div>
       <div class="progress-line">
         <span id="progressFill"></span>
       </div>
-      <ol id="taskList" class="task-list"></ol>
     </section>
 
-    <section class="fleet-panel" aria-label="Flotta mezzi">
-      <button class="fleet-button active" type="button" data-vehicle="excavator">Escavatore</button>
-      <button class="fleet-button" type="button" data-vehicle="vaiacar">Vaiacar</button>
-      <button class="fleet-button" type="button" data-vehicle="tamper">Rincalzatrice</button>
-    </section>
-
-    <section class="control-panel" aria-label="Comandi mezzo">
+    <section class="control-layer" aria-label="Controlli">
+      <div id="cameraTouchZone" class="camera-touch-zone" aria-label="Camera touch"></div>
       <div class="joystick" id="joystick" aria-label="Joystick movimento">
         <button type="button" data-dir="forward" aria-label="Avanti"></button>
         <button type="button" data-dir="right" aria-label="Destra"></button>
@@ -67,13 +94,10 @@
         <button type="button" data-dir="left" aria-label="Sinistra"></button>
         <span id="joyKnob"></span>
       </div>
-      <div class="action-grid">
-        <button id="enterButton" class="action-button primary" type="button">SALI / SCENDI</button>
-        <button id="engineButton" class="action-button" type="button">MOTORE</button>
-        <button id="railGearButton" class="action-button" type="button">RUOTE FERRO</button>
-        <button id="toolButton" class="action-button primary" type="button">LAVORA</button>
-        <button id="cameraButton" class="action-button" type="button">CAM</button>
-        <button id="radioButton" class="action-button" type="button">RADIO</button>
+      <div id="actionPad" class="action-pad hidden" aria-label="Azioni mezzo">
+        <button id="primaryAction" class="action-orb primary" type="button">SCAVA</button>
+        <button id="secondaryAction" class="action-orb" type="button">BRACCIO</button>
+        <button id="tertiaryAction" class="action-orb" type="button">SGANCIA</button>
       </div>
     </section>
 

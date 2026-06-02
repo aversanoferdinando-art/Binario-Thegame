@@ -1,36 +1,71 @@
 import { formatPercent } from '../core/math.js';
 
+const ACTION_LABELS = {
+  excavator: ['SCAVA', 'BRACCIO', 'SGANCIA'],
+  vaiacar: ['PINZA', 'GRU', 'SCARICA'],
+  tamper: ['RINCALZA', 'ALLINEA', 'STOP']
+};
+
 export class HUD {
-  constructor() {
+  constructor(root) {
+    this.root = root;
     this.elements = {
+      avatarGarage: document.getElementById('avatarGarage'),
+      operatorName: document.getElementById('operatorNameInput'),
+      startShift: document.getElementById('startShiftButton'),
+      swatches: document.querySelectorAll('.swatch'),
       hudToggle: document.getElementById('hudToggle'),
-      instrumentPanel: document.getElementById('instrumentPanel'),
       clock: document.getElementById('clockText'),
       weather: document.getElementById('weatherText'),
+      mode: document.getElementById('modeChip'),
+      contextStrip: document.getElementById('contextStrip'),
+      contextHint: document.getElementById('contextHint'),
+      contextTitle: document.getElementById('contextTitle'),
+      contextButton: document.getElementById('contextButton'),
       phase: document.getElementById('jobPhaseText'),
       objective: document.getElementById('objectiveText'),
       progress: document.getElementById('progressFill'),
-      taskList: document.getElementById('taskList'),
-      vehicleName: document.getElementById('vehicleNameText'),
-      role: document.getElementById('roleText'),
+      telemetryDock: document.getElementById('telemetryDock'),
+      missionWidget: document.getElementById('missionWidget'),
       speed: document.getElementById('speedText'),
-      engine: document.getElementById('engineText'),
       hydraulic: document.getElementById('hydraulicText'),
-      grip: document.getElementById('gripText'),
+      fuel: document.getElementById('fuelText'),
       alignment: document.getElementById('alignmentText'),
       ballast: document.getElementById('ballastText'),
+      actionPad: document.getElementById('actionPad'),
+      primaryAction: document.getElementById('primaryAction'),
+      secondaryAction: document.getElementById('secondaryAction'),
+      tertiaryAction: document.getElementById('tertiaryAction'),
       radioLog: document.getElementById('radioLog'),
-      toast: document.getElementById('toast'),
-      miniMap: document.getElementById('miniMapCanvas')
+      toast: document.getElementById('toast')
     };
     this.toastTimer = 0;
-    this.miniCtx = this.elements.miniMap.getContext('2d');
+    this.hudMinimized = false;
     this.bind();
   }
 
   bind() {
     this.elements.hudToggle.addEventListener('click', () => {
-      this.elements.instrumentPanel.classList.toggle('collapsed');
+      this.hudMinimized = !this.hudMinimized;
+      this.root.classList.toggle('hud-min', this.hudMinimized);
+    });
+  }
+
+  bindAvatar(player, startCallback) {
+    this.elements.operatorName.addEventListener('input', () => player.setName(this.elements.operatorName.value));
+    this.elements.swatches.forEach((button) => {
+      button.addEventListener('click', () => {
+        const style = button.dataset.style;
+        player.setStyle(style, button.dataset.color);
+        document.querySelectorAll(`.swatch[data-style="${style}"]`).forEach((swatch) => {
+          swatch.classList.toggle('active', swatch === button);
+        });
+      });
+    });
+    this.elements.startShift.addEventListener('click', () => {
+      player.setName(this.elements.operatorName.value);
+      this.elements.avatarGarage.classList.add('hidden');
+      startCallback();
     });
   }
 
@@ -38,81 +73,70 @@ export class HUD {
     window.clearTimeout(this.toastTimer);
     this.elements.toast.textContent = message;
     this.elements.toast.classList.add('show');
-    this.toastTimer = window.setTimeout(() => this.elements.toast.classList.remove('show'), 1800);
+    this.toastTimer = window.setTimeout(() => this.elements.toast.classList.remove('show'), 1700);
   }
 
-  update({ world, vehicles, selectedVehicle, construction, jobManager, coop }) {
+  setActionLabels(vehicle) {
+    const labels = ACTION_LABELS[vehicle?.id] || ACTION_LABELS.excavator;
+    this.elements.primaryAction.textContent = labels[0];
+    this.elements.secondaryAction.textContent = labels[1];
+    this.elements.tertiaryAction.textContent = labels[2];
+  }
+
+  update({ world, vehicles, player, activeVehicle, selectedVehicle, nearbyVehicle, construction, jobManager, coop }) {
     const hours = Math.floor(world.timeOfDay).toString().padStart(2, '0');
     const minutes = Math.floor((world.timeOfDay % 1) * 60).toString().padStart(2, '0');
-    const telemetry = selectedVehicle.telemetry(world.railNetwork);
+    const focusVehicle = activeVehicle || selectedVehicle || vehicles[0];
+    const telemetry = focusVehicle.telemetry(world.railNetwork);
     const phase = construction.activePhase;
 
+    this.root.classList.toggle('explore-mode', player.isOnFoot && !nearbyVehicle);
+    this.root.classList.toggle('work-mode', Boolean(activeVehicle) || Boolean(nearbyVehicle));
     this.elements.clock.textContent = `${hours}:${minutes}`;
-    this.elements.weather.textContent = `pioggia ${Math.round(world.weather.rain * 100)}% | nebbia ${Math.round(world.weather.fog * 100)}%`;
+    this.elements.weather.textContent = weatherLabel(world.weather);
+    this.elements.mode.textContent = activeVehicle ? focusVehicle.radioName : player.name.toUpperCase();
     this.elements.phase.textContent = phase.label;
-    this.elements.objective.textContent = jobManager.objectiveForVehicle(selectedVehicle);
+    this.elements.objective.textContent = jobManager.objectiveForState(player, focusVehicle, nearbyVehicle?.vehicle);
     this.elements.progress.style.width = `${Math.round(construction.totalProgress * 100)}%`;
-    this.elements.vehicleName.textContent = selectedVehicle.name;
-    this.elements.role.textContent = `Ruolo: ${coop.statusText()}`;
-    this.elements.speed.textContent = `${telemetry.speedKmh.toFixed(1)} km/h`;
-    this.elements.engine.textContent = telemetry.engine;
-    this.elements.hydraulic.textContent = `${telemetry.hydraulic} bar`;
-    this.elements.grip.textContent = formatPercent(telemetry.grip);
-    this.elements.alignment.textContent = `${telemetry.alignment} mm`;
-    this.elements.ballast.textContent = telemetry.ballast;
 
-    this.elements.taskList.innerHTML = construction.taskRows().map((row) => {
-      const cls = row.done ? 'done' : row.active ? 'active' : '';
-      return `<li class="${cls}"><span>${row.label}</span><small>${Math.round(row.progress * 100)}%</small></li>`;
-    }).join('');
+    this.elements.speed.textContent = `${telemetry.speedKmh.toFixed(0)}`;
+    this.elements.hydraulic.textContent = `${telemetry.hydraulic}`;
+    this.elements.fuel.textContent = formatPercent(focusVehicle.fuel);
+    this.elements.alignment.textContent = `${telemetry.alignment}`;
+    this.elements.ballast.textContent = shortBallast(telemetry.ballast);
+
+    this.elements.actionPad.classList.toggle('hidden', !activeVehicle);
+    if (activeVehicle) this.setActionLabels(activeVehicle);
+
+    const showContext = Boolean(activeVehicle || nearbyVehicle);
+    this.elements.contextStrip.classList.toggle('hidden', !showContext);
+    if (activeVehicle) {
+      this.elements.contextHint.textContent = activeVehicle.name;
+      this.elements.contextTitle.textContent = 'A BORDO';
+      this.elements.contextButton.textContent = 'SCENDI';
+    } else if (nearbyVehicle) {
+      this.elements.contextHint.textContent = nearbyVehicle.vehicle.name;
+      this.elements.contextTitle.textContent = 'TAP PER SALIRE';
+      this.elements.contextButton.textContent = 'ENTRA';
+    }
 
     this.elements.radioLog.innerHTML = world.radioMessages.map((message) => `<p>${message}</p>`).join('');
-    this.drawMiniMap(world, vehicles, selectedVehicle);
+    this.elements.missionWidget.style.display = construction.totalProgress >= 1 ? 'none' : '';
+    this.elements.telemetryDock.setAttribute('aria-hidden', activeVehicle ? 'false' : 'true');
+    this.elements.mode.title = coop.statusText();
   }
+}
 
-  drawMiniMap(world, vehicles, selectedVehicle) {
-    const canvas = this.elements.miniMap;
-    const rect = canvas.getBoundingClientRect();
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.max(1, Math.floor(rect.width * ratio));
-    canvas.height = Math.max(1, Math.floor(rect.height * ratio));
-    const ctx = this.miniCtx;
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    ctx.fillStyle = 'rgba(9, 13, 12, 0.8)';
-    ctx.fillRect(0, 0, rect.width, rect.height);
+function weatherLabel(weather) {
+  if (weather.rain > 0.26) return 'pioggia intensa';
+  if (weather.fog > 0.26) return 'nebbia fredda';
+  if (weather.rain > 0.12) return 'asfalto bagnato';
+  return 'alba operativa';
+}
 
-    const y0 = selectedVehicle.y - 500;
-    const y1 = selectedVehicle.y + 900;
-    for (const track of world.railNetwork.tracks) {
-      const x = rect.width * 0.5 + track.x * 0.42;
-      ctx.strokeStyle = 'rgba(180, 184, 174, 0.55)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, rect.height);
-      ctx.stroke();
-    }
-
-    ctx.fillStyle = 'rgba(219, 93, 79, 0.8)';
-    for (const track of world.railNetwork.tracks) {
-      for (const fault of track.faults) {
-        if (fault.repaired || fault.y < y0 || fault.y > y1) continue;
-        const x = rect.width * 0.5 + track.x * 0.42;
-        const y = rect.height - ((fault.y - y0) / (y1 - y0)) * rect.height;
-        ctx.beginPath();
-        ctx.arc(x, y, 3 + fault.severity * 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    for (const vehicle of vehicles) {
-      const x = rect.width * 0.5 + vehicle.x * 0.42;
-      const y = rect.height - ((vehicle.y - y0) / (y1 - y0)) * rect.height;
-      ctx.fillStyle = vehicle === selectedVehicle ? '#ffd56f' : '#7aa7c9';
-      ctx.beginPath();
-      ctx.arc(x, y, vehicle === selectedVehicle ? 5 : 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
+function shortBallast(label) {
+  if (label === 'compatto') return 'OK';
+  if (label === 'da rincalzare') return 'MID';
+  if (label === 'sporco') return 'LOW';
+  return 'FAIL';
 }
