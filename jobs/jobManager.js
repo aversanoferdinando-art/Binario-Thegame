@@ -9,11 +9,13 @@ export class JobManager {
     };
   }
 
-  objectiveForVehicle(vehicle) {
+  objectiveForState(player, vehicle, nearbyVehicle = null) {
     const phase = this.construction.activePhase;
     const needed = phase.required.join(', ');
-    if (!vehicle.engineOn) return `Avvia ${vehicle.name}. Fase attiva: ${phase.label}.`;
-    if (!vehicle.railGearDown && vehicle.type !== 'excavator') return 'Abbassa ruote ferroviarie e portati sul binario 2.';
+    if (player.isOnFoot && nearbyVehicle) return `Sali su ${nearbyVehicle.name.split(' ')[0]} per iniziare la fase.`;
+    if (player.isOnFoot) return 'Raggiungi un mezzo nel piazzale operativo.';
+    if (!vehicle.engineOn) return `Avvia ${vehicle.name}.`;
+    if (!vehicle.railGearDown && vehicle.type !== 'excavator') return 'Porta il mezzo in assetto ferro sul binario 2.';
     return `${phase.label}. Attrezzature richieste: ${needed}.`;
   }
 }
