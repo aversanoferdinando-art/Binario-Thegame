@@ -1,6 +1,8 @@
+import { clamp } from './core/math.js';
 import { SimCamera } from './world/camera.js';
 import { SiteRenderer } from './world/rendering.js';
 import { SimulationWorld } from './world/world.js';
+import { PlayerController } from './player/playerController.js';
 import { RailRoadExcavator } from './vehicles/excavator.js';
 import { Vaiacar } from './vehicles/vaiacar.js';
 import { BallastTamper } from './vehicles/tamper.js';
@@ -11,15 +13,18 @@ import { CoOpDirector } from './multiplayer/coOpDirector.js';
 import { AudioSystem } from './audio/audioSystem.js';
 import { HUD } from './ui/hud.js';
 
+const root = document.getElementById('simRoot');
 const canvas = document.getElementById('simCanvas');
 const camera = new SimCamera();
 const renderer = new SiteRenderer(canvas, camera);
 const world = new SimulationWorld();
+const player = new PlayerController();
 const construction = new ConstructionSystem();
 const jobs = new JobManager(construction);
 const economy = new EconomyManager();
 const coop = new CoOpDirector();
 const audio = new AudioSystem();
+const hud = new HUD(root);
 
 const vehicles = [
   new RailRoadExcavator(),
@@ -28,77 +33,203 @@ const vehicles = [
 ];
 
 let selectedVehicle = vehicles[0];
+let activeVehicle = null;
 let lastTime = performance.now();
 let toolHeld = false;
-let joystickDir = null;
+let gameStarted = false;
+let joystickVector = { x: 0, y: 0 };
 let lastProgress = construction.totalProgress;
-
+let activePointerId = null;
+let lastPinchDistance = 0;
+const cameraPointers = new Map();
 const keys = new Set();
-const hud = new HUD();
 
 function resize() {
   renderer.resize();
 }
 
-function selectVehicle(id) {
-  selectedVehicle = vehicles.find((vehicle) => vehicle.id === id) || selectedVehicle;
-  coop.assignRoleForVehicle(id);
-  document.querySelectorAll('.fleet-button').forEach((button) => {
-    button.classList.toggle('active', button.dataset.vehicle === id);
-  });
-  hud.showToast(`${selectedVehicle.name} selezionato`);
+function activeTarget() {
+  return activeVehicle || player;
 }
 
-function toggleEnter() {
-  for (const vehicle of vehicles) vehicle.operatorInside = false;
-  selectedVehicle.operatorInside = !selectedVehicle.operatorInside;
-  if (selectedVehicle.operatorInside) {
-    world.radio(`Caposquadra: operatore a bordo su ${selectedVehicle.radioName}.`);
-    hud.showToast(`A bordo: ${selectedVehicle.radioName}`);
-  } else {
-    world.radio(`Caposquadra: operatore sceso da ${selectedVehicle.radioName}.`);
-    hud.showToast('Operatore a terra');
+function nearbyVehicle() {
+  if (!gameStarted || !player.isOnFoot) return null;
+  return player.nearestVehicle(vehicles, 82);
+}
+
+function enterVehicle(vehicle) {
+  if (!vehicle) return;
+  activeVehicle = vehicle;
+  selectedVehicle = vehicle;
+  for (const other of vehicles) other.operatorInside = false;
+  vehicle.operatorInside = true;
+  vehicle.engineOn = true;
+  vehicle.railGearDown = true;
+  player.enter(vehicle);
+  coop.assignRoleForVehicle(vehicle.id);
+  camera.beginCinematic();
+  audio.enable();
+  audio.radioBeep();
+  world.radio(`Caposquadra: ${player.name} a bordo su ${vehicle.radioName}. Motore e assetto ferro pronti.`);
+  hud.setActionLabels(vehicle);
+  hud.showToast(`A bordo: ${vehicle.radioName}`);
+}
+
+function exitVehicle() {
+  if (!activeVehicle) return;
+  const vehicle = activeVehicle;
+  vehicle.operatorInside = false;
+  vehicle.stopTool();
+  toolHeld = false;
+  activeVehicle = null;
+  player.exit(vehicle);
+  camera.beginCinematic();
+  world.radio(`${vehicle.radioName}: operatore a terra, mezzo in sicurezza.`);
+  hud.showToast('Operatore a terra');
+}
+
+function useContextAction() {
+  audio.enable();
+  if (activeVehicle) {
+    exitVehicle();
+    return;
   }
+  enterVehicle(nearbyVehicle()?.vehicle);
 }
 
-function inputForVehicle(vehicle) {
-  if (!vehicle.operatorInside) return { throttle: 0, brake: 1, steer: 0 };
-  let throttle = 0;
+function vehicleInput(vehicle) {
+  if (vehicle !== activeVehicle) return { throttle: 0, brake: 0.45, steer: 0 };
+  let throttle = joystickVector.y;
+  let steer = joystickVector.x;
   let brake = 0;
-  let steer = 0;
-  if (keys.has('arrowup') || keys.has('w') || joystickDir === 'forward') throttle += 1;
-  if (keys.has('arrowdown') || keys.has('s') || joystickDir === 'reverse') throttle -= 0.45;
+  if (keys.has('arrowup') || keys.has('w')) throttle += 1;
+  if (keys.has('arrowdown') || keys.has('s')) throttle -= 0.45;
+  if (keys.has('arrowleft') || keys.has('a')) steer -= 1;
+  if (keys.has('arrowright') || keys.has('d')) steer += 1;
   if (keys.has('shift')) brake = 1;
-  if (keys.has('arrowleft') || keys.has('a') || joystickDir === 'left') steer -= 1;
-  if (keys.has('arrowright') || keys.has('d') || joystickDir === 'right') steer += 1;
-  return { throttle, brake, steer };
-}
-
-function setJoystickVisual(dir) {
-  const knob = document.getElementById('joyKnob');
-  const offsets = {
-    forward: 'translate(0, -22px)',
-    reverse: 'translate(0, 22px)',
-    left: 'translate(-22px, 0)',
-    right: 'translate(22px, 0)'
+  return {
+    throttle: clamp(throttle, -0.45, 1),
+    steer: clamp(steer, -1, 1),
+    brake
   };
-  knob.style.transform = offsets[dir] || 'translate(0, 0)';
 }
 
-function bindControls() {
-  window.addEventListener('resize', resize);
+function playerInput() {
+  let x = joystickVector.x;
+  let y = joystickVector.y;
+  if (keys.has('arrowup') || keys.has('w')) y += 1;
+  if (keys.has('arrowdown') || keys.has('s')) y -= 1;
+  if (keys.has('arrowleft') || keys.has('a')) x -= 1;
+  if (keys.has('arrowright') || keys.has('d')) x += 1;
+  return { x: clamp(x, -1, 1), y: clamp(y, -1, 1) };
+}
+
+function setJoystickVisual(x, y) {
+  const knob = document.getElementById('joyKnob');
+  knob.style.transform = `translate(${x * 23}px, ${-y * 23}px)`;
+}
+
+function setJoystickFromPointer(event) {
+  const joystick = document.getElementById('joystick');
+  const rect = joystick.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const radius = rect.width * 0.42;
+  joystickVector = {
+    x: clamp((event.clientX - cx) / radius, -1, 1),
+    y: clamp((cy - event.clientY) / radius, -1, 1)
+  };
+  setJoystickVisual(joystickVector.x, joystickVector.y);
+}
+
+function resetJoystick() {
+  joystickVector = { x: 0, y: 0 };
+  setJoystickVisual(0, 0);
+  activePointerId = null;
+}
+
+function bindJoystick() {
+  const joystick = document.getElementById('joystick');
+  joystick.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    audio.enable();
+    activePointerId = event.pointerId;
+    joystick.setPointerCapture?.(event.pointerId);
+    setJoystickFromPointer(event);
+  });
+  joystick.addEventListener('pointermove', (event) => {
+    if (event.pointerId === activePointerId) setJoystickFromPointer(event);
+  });
+  joystick.addEventListener('pointerup', resetJoystick);
+  joystick.addEventListener('pointercancel', resetJoystick);
+}
+
+function bindCameraTouch() {
+  const zone = document.getElementById('cameraTouchZone');
+  zone.addEventListener('pointerdown', (event) => {
+    cameraPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    zone.setPointerCapture?.(event.pointerId);
+  });
+  zone.addEventListener('pointermove', (event) => {
+    const last = cameraPointers.get(event.pointerId);
+    if (!last) return;
+    cameraPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (cameraPointers.size >= 2) {
+      const points = [...cameraPointers.values()];
+      const distance = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+      if (lastPinchDistance) camera.pinch((distance - lastPinchDistance) * 0.002);
+      lastPinchDistance = distance;
+      return;
+    }
+    camera.nudge(-(event.clientX - last.x), event.clientY - last.y);
+  });
+  zone.addEventListener('pointerup', (event) => {
+    cameraPointers.delete(event.pointerId);
+    lastPinchDistance = 0;
+  });
+  zone.addEventListener('pointercancel', (event) => {
+    cameraPointers.delete(event.pointerId);
+    lastPinchDistance = 0;
+  });
+}
+
+function bindActions() {
+  document.getElementById('contextButton').addEventListener('click', useContextAction);
+
+  const primary = document.getElementById('primaryAction');
+  primary.addEventListener('pointerdown', () => {
+    audio.enable();
+    toolHeld = true;
+  });
+  primary.addEventListener('pointerup', () => { toolHeld = false; });
+  primary.addEventListener('pointercancel', () => { toolHeld = false; });
+
+  document.getElementById('secondaryAction').addEventListener('click', () => {
+    if (!activeVehicle) return;
+    audio.enable();
+    camera.beginCinematic();
+    world.radio(`${activeVehicle.radioName}: attrezzatura secondaria posizionata.`);
+    hud.showToast('Assetto attrezzo regolato');
+  });
+
+  document.getElementById('tertiaryAction').addEventListener('click', () => {
+    if (!activeVehicle) return;
+    audio.enable();
+    activeVehicle.stopTool();
+    toolHeld = false;
+    world.radio(`${activeVehicle.radioName}: materiale sganciato, area libera.`);
+    hud.showToast('Operazione sicura');
+  });
+}
+
+function bindKeyboard() {
   window.addEventListener('keydown', (event) => {
     const key = event.key.toLowerCase();
     if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'w', 'a', 's', 'd'].includes(key)) {
       event.preventDefault();
     }
     keys.add(key);
-    if (key === '1') selectVehicle('excavator');
-    if (key === '2') selectVehicle('vaiacar');
-    if (key === '3') selectVehicle('tamper');
-    if (key === 'e') toggleEnter();
-    if (key === 'm') toggleEngine();
-    if (key === 'r') toggleRailGear();
+    if (key === 'e') useContextAction();
     if (key === 'c') camera.cycleMode();
     if (key === ' ') toolHeld = true;
   });
@@ -107,83 +238,41 @@ function bindControls() {
     keys.delete(key);
     if (key === ' ') toolHeld = false;
   });
-
-  document.querySelectorAll('.fleet-button').forEach((button) => {
-    button.addEventListener('click', () => {
-      audio.enable();
-      selectVehicle(button.dataset.vehicle);
-    });
-  });
-
-  document.getElementById('enterButton').addEventListener('click', () => {
-    audio.enable();
-    toggleEnter();
-  });
-  document.getElementById('engineButton').addEventListener('click', () => {
-    audio.enable();
-    toggleEngine();
-  });
-  document.getElementById('railGearButton').addEventListener('click', () => {
-    audio.enable();
-    toggleRailGear();
-  });
-  document.getElementById('toolButton').addEventListener('pointerdown', () => {
-    audio.enable();
-    toolHeld = true;
-  });
-  document.getElementById('toolButton').addEventListener('pointerup', () => { toolHeld = false; });
-  document.getElementById('toolButton').addEventListener('pointercancel', () => { toolHeld = false; });
-  document.getElementById('cameraButton').addEventListener('click', () => camera.cycleMode());
-  document.getElementById('radioButton').addEventListener('click', () => {
-    audio.enable();
-    audio.radioBeep();
-    world.radio(`Radio ${selectedVehicle.radioName}: posizione ${Math.round(selectedVehicle.y)} m, fase ${construction.activePhase.label}.`);
-  });
-
-  document.querySelectorAll('#joystick button').forEach((button) => {
-    button.addEventListener('pointerdown', (event) => {
-      audio.enable();
-      event.preventDefault();
-      joystickDir = button.dataset.dir;
-      button.setPointerCapture?.(event.pointerId);
-      setJoystickVisual(joystickDir);
-    });
-    button.addEventListener('pointerup', () => {
-      joystickDir = null;
-      setJoystickVisual(null);
-    });
-    button.addEventListener('pointercancel', () => {
-      joystickDir = null;
-      setJoystickVisual(null);
-    });
-  });
 }
 
-function toggleEngine() {
-  selectedVehicle.toggleEngine();
-  world.radio(`${selectedVehicle.radioName}: motore ${selectedVehicle.engineOn ? 'avviato' : 'arrestato'}.`);
-  hud.showToast(selectedVehicle.engineOn ? 'Motore diesel avviato' : 'Motore spento');
-}
-
-function toggleRailGear() {
-  selectedVehicle.toggleRailGear();
-  world.radio(`${selectedVehicle.radioName}: ruote ferroviarie ${selectedVehicle.railGearDown ? 'abbassate' : 'sollevate'}.`);
-  hud.showToast(selectedVehicle.railGearDown ? 'Assetto ferro attivo' : 'Assetto gomma attivo');
+function bindControls() {
+  window.addEventListener('resize', resize);
+  bindKeyboard();
+  bindJoystick();
+  bindCameraTouch();
+  bindActions();
+  hud.bindAvatar(player, () => {
+    gameStarted = true;
+    audio.enable();
+    camera.beginCinematic();
+    world.radio(`${player.name}: turno iniziato, raggiungo il piazzale operativo.`);
+    hud.showToast('Turno operativo iniziato');
+  });
 }
 
 function update(dt) {
-  world.update(dt);
+  const near = nearbyVehicle();
+  if (!activeVehicle && near?.vehicle) selectedVehicle = near.vehicle;
+
+  world.update(dt, activeTarget());
+  player.update(playerInput(), dt, world.railNetwork);
+
   for (const vehicle of vehicles) {
-    vehicle.setInput(vehicle === selectedVehicle ? inputForVehicle(vehicle) : { throttle: 0, brake: 0.35, steer: 0 });
+    vehicle.setInput(vehicleInput(vehicle));
     vehicle.update(dt, world.railNetwork);
-    if (vehicle !== selectedVehicle) vehicle.stopTool();
+    if (vehicle !== activeVehicle) vehicle.stopTool();
   }
 
-  if (toolHeld) {
-    const result = selectedVehicle.operate(construction, world, dt);
+  if (toolHeld && activeVehicle) {
+    const result = activeVehicle.operate(construction, world, dt);
     if (result && !result.ok && Math.random() < 0.035) hud.showToast(result.message);
-  } else {
-    selectedVehicle.stopTool();
+  } else if (activeVehicle) {
+    activeVehicle.stopTool();
   }
 
   const progressDelta = construction.totalProgress - lastProgress;
@@ -191,14 +280,28 @@ function update(dt) {
     economy.reward(progressDelta);
     lastProgress = construction.totalProgress;
   }
+
   economy.update(dt, vehicles);
-  audio.update(selectedVehicle, world);
-  camera.update(selectedVehicle, dt);
+  audio.update(activeVehicle || selectedVehicle, world);
+  camera.update(activeTarget(), dt, { onFoot: player.isOnFoot });
 }
 
 function render() {
-  world.render(renderer, vehicles, selectedVehicle);
-  hud.update({ world, vehicles, selectedVehicle, construction, jobManager: jobs, coop, economy });
+  const near = nearbyVehicle();
+  const highlight = activeVehicle || near?.vehicle || selectedVehicle;
+  world.render(renderer, vehicles, highlight, player);
+  hud.update({
+    world,
+    vehicles,
+    player,
+    activeVehicle,
+    selectedVehicle: highlight,
+    nearbyVehicle: near,
+    construction,
+    jobManager: jobs,
+    coop,
+    economy
+  });
 }
 
 function frame(now) {
@@ -211,8 +314,6 @@ function frame(now) {
 
 resize();
 bindControls();
-selectedVehicle.operatorInside = true;
-selectedVehicle.engineOn = true;
-world.radio('Caposquadra: Fase 1 caricata. Mezzi pronti, binario 2 da rinnovare.');
-hud.showToast('Fase 1 simulatore caricata');
+camera.beginCinematic();
+world.radio('Caposquadra: alba fredda sullo scalo. Mezzi pronti nel piazzale.');
 requestAnimationFrame(frame);
