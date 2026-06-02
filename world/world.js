@@ -13,6 +13,9 @@ export class SimulationWorld {
     this.workers = [];
     this.trains = [];
     this.particles = [];
+    this.dynamicEvents = [];
+    this.eventTimer = 9;
+    this.radioTimer = 4;
     this.radioMessages = ['Radio: linea interrotta, finestra lavori confermata fino alle 12:00.'];
     this.generateWorld();
   }
@@ -29,12 +32,12 @@ export class SimulationWorld {
       });
     }
 
-    for (let i = 0; i < 28; i += 1) {
+    for (let i = 0; i < 44; i += 1) {
       this.yardStacks.push({
-        type: i % 3 === 0 ? 'rails' : i % 3 === 1 ? 'sleepers' : 'container',
+        type: ['rails', 'sleepers', 'container', 'welder', 'crane', 'diesel'][i % 6],
         concrete: i % 4 === 0,
-        x: 118 + (i % 4) * 46,
-        y: 730 + Math.floor(i / 4) * 64,
+        x: 110 + (i % 5) * 44,
+        y: 690 + Math.floor(i / 5) * 58,
         z: 0,
         rot: (i % 5 - 2) * 0.05
       });
@@ -57,7 +60,7 @@ export class SimulationWorld {
     this.trains.push({ x: 42, y: 4600, speed: -10, length: 180 });
   }
 
-  update(dt) {
+  update(dt, focusTarget = null) {
     this.timeOfDay += dt * 0.018;
     if (this.timeOfDay >= 24) this.timeOfDay -= 24;
     const daylight = Math.sin(((this.timeOfDay - 5.4) / 14.8) * Math.PI);
@@ -70,12 +73,46 @@ export class SimulationWorld {
     for (const train of this.trains) {
       train.y += train.speed * dt;
       if (train.y < -300) train.y = this.railNetwork.length + 400;
+      if (focusTarget && Math.abs(train.y - focusTarget.y) < 220 && !train.horned) {
+        train.horned = true;
+        this.radio('Segnale: treno merci in transito su binario aperto, mantenere distanza.');
+      }
+      if (focusTarget && Math.abs(train.y - focusTarget.y) > 520) train.horned = false;
     }
     for (const worker of this.workers) {
       worker.phase += dt;
-      worker.x += Math.sin(worker.phase * 0.7) * dt * 1.8;
-      worker.y += Math.cos(worker.phase * 0.5) * dt * 2.4;
+      worker.x += Math.sin(worker.phase * 0.7) * dt * 2.2;
+      worker.y += Math.cos(worker.phase * 0.5) * dt * 3.1;
+      if (worker.y < 780 || worker.y > 1450) worker.phase += Math.PI;
     }
+
+    this.radioTimer -= dt;
+    if (this.radioTimer <= 0) {
+      const lines = [
+        'Operaio 2: saldatrice pronta vicino al container utensili.',
+        'Caposquadra: verifica sagoma libera prima della manovra.',
+        'Operaio 4: ballast umido, procedere lenti in zona scambio.',
+        'RFI: finestra confermata, binario dispari aperto al traffico.'
+      ];
+      this.radio(lines[Math.floor(Math.random() * lines.length)]);
+      this.radioTimer = 14 + Math.random() * 12;
+    }
+
+    this.eventTimer -= dt;
+    if (this.eventTimer <= 0) {
+      const events = [
+        { type: 'switch', label: 'Guasto motore deviatoio 02', x: -42, y: 1560 },
+        { type: 'ballast', label: 'Cedimento ballast rilevato', x: 0, y: 1180 },
+        { type: 'rail', label: 'Rottura rotaia segnalata', x: 42, y: 2060 }
+      ];
+      const event = events[Math.floor(Math.random() * events.length)];
+      this.dynamicEvents.push({ ...event, life: 22 });
+      this.radio(`Emergenza RFI: ${event.label}.`);
+      this.eventTimer = 38 + Math.random() * 30;
+    }
+
+    for (const event of this.dynamicEvents) event.life -= dt;
+    this.dynamicEvents = this.dynamicEvents.filter((event) => event.life > 0);
 
     for (const particle of this.particles) {
       particle.x += particle.vx * dt;
@@ -111,14 +148,16 @@ export class SimulationWorld {
     this.radioMessages = this.radioMessages.slice(-5);
   }
 
-  render(renderer, vehicles, selectedVehicle) {
+  render(renderer, vehicles, selectedVehicle, player) {
     renderer.clear(this);
     renderer.drawGround(this);
     renderer.drawStationAndYard(this);
     renderer.drawVegetation(this);
     renderer.drawRailNetwork(this.railNetwork);
     for (const train of this.trains) renderer.drawTrain(train);
+    renderer.drawDynamicEvents(this.dynamicEvents);
     renderer.drawWorkers(this.workers);
+    player?.draw(renderer, !selectedVehicle);
     vehicles
       .slice()
       .sort((a, b) => a.y - b.y)
